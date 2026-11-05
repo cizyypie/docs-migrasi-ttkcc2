@@ -1,7 +1,7 @@
 # Dokumentasi Teknis: TTK Corporate Kubikasi (TTKCC2)
 
 > [!NOTE]
-> Dokumen ini menjelaskan spesifikasi arsitektur, struktur form, integrasi query database, logika bisnis kalkulasi kubikasi dan biaya tambahan, serta alur data pada halaman [TTKCC2.vue](file:///home/wahyu/project/swb/web/dev/dcaf/src/pages/TTKCC2.vue).
+> Dokumen ini menjelaskan spesifikasi arsitektur, struktur form, integrasi query database, logika bisnis kalkulasi kubikasi dan biaya tambahan, serta alur data pada branch [TTKCC2-FZ](https://git.wahana.com/wahanagit/swb/-/tree/TTKCC2-FZ).
 
 ---
 
@@ -17,6 +17,9 @@ Halaman ini merupakan modernisasi dari formulir legasi DCAF/DW:
   - Skema multi-koli dengan kemampuan scan OCR surat jalan per koli.
   - Penentuan berat tagihan (*charged weight*) berbasis nilai maksimal antara akumulasi berat kotor dan akumulasi kubikasi.
   - Perhitungan biaya kirim dan biaya tambahan murni 100% dari database via query `whnPriceListAdditional`.
+
+#### 📄 Dokumen Terkait
+ [Changelog](docs/changelog.md):  Riwayat perubahan per commit (kondisi awal, masalah, solusi, contoh kasus) dan daftar risiko yang perlu ditindaklanjuti 
 
 ---
 
