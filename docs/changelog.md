@@ -3,8 +3,7 @@
 > **Branch:** `TTKCC2-FZ` · **File terdampak:** `web/dev/dcaf/src/pages/TTKCC2.vue`
 > **Rentang commit:** `e6168b05` → `33db7799` (termasuk `07e5afb5` yang masuk lewat merge)
 
-## Ringkasan (untuk Stakeholder)
-
+## Ringkasan 
 | # | Commit | Perubahan singkat | Dampak bisnis |
 |---|--------|-------------------|---------------|
 | 1 | `07e5afb5` + merge `eaaf7af9` | Kubikasi terisi otomatis dari hasil scan OCR surat jalan | Input lebih cepat, salah ketik berkurang |
