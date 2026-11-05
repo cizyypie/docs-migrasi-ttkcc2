@@ -1,40 +1,44 @@
 # 📦 TTKCC2 — Changelog Kalkulasi Tarif & Biaya Tambahan
 
 > **Branch:** `TTKCC2-FZ` · **File terdampak:** `web/dev/dcaf/src/pages/TTKCC2.vue`
-> **Rentang commit:** `e6168b05` → `33db7799` (termasuk `07e5afb5` yang masuk lewat merge)
-
-## Ringkasan 
-| # | Commit | Perubahan singkat | Dampak bisnis |
-|---|--------|-------------------|---------------|
-| 1 | `07e5afb5` + merge `eaaf7af9` | Kubikasi terisi otomatis dari hasil scan OCR surat jalan | Input lebih cepat, salah ketik berkurang |
-| 2 | `e6168b05` | Tarif & biaya tambahan diambil dari database | Harga mengikuti master tarif, tidak lagi angka tetap di kode |
-| 3 | `2cd9f93c` | Rute (kode ops) khusus akun kini mempertimbangkan berat | Akun dengan rute berbeda per tier berat terlayani dengan benar |
-| 4 | `33db7799` | Packing kayu, bubble & surcharge berat ikut aturan database | Biaya packing konsisten dengan kebijakan tarif per akun/layanan |
-
-### Alur kalkulasi setelah semua perubahan
-
-  ```mermaid
-  flowchart TD
-      A[Scan OCR surat jalan] -->|autofill kubikasi| B[Daftar Koli]
-      B --> C[Hitung Charged Weight]
-      C --> D[whnGetRouteListByAccV2<br/>rute akun + tier berat]
-      D -->|tidak ada| E[Fallback whnPriceListBaru<br/>rute standar]
-      D --> F[whnPriceListBaru<br/>biaya kirim]
-      E --> F
-      F --> G[whnPriceListAdditional<br/>aturan biaya tambahan per akun & layanan]
-      G --> H1[Asuransi ASVC-INS]
-      G --> H2[Pickup ASVC-PIC]
-      G --> H3[Realokasi ASVC-PKR/RLC]
-      G --> H4{Ada Packing?}
-      H4 -->|Ya| P1[Kayu ASVC-PKW]
-      H4 -->|Ya| P2[Bubble ASVC-PKB]
-      H4 -->|Ya| P3[Surcharge ASVC-SCG]
-      H1 & H2 & H3 & P1 & P2 & P3 --> T[Total Biaya]
-  ```
+> **Rentang commit:** `07e5afb5` → `1b70118f`
 
 ---
 
-## 1. Autofill Kubikasi dari OCR — `07e5afb5` (via merge `eaaf7af9`)
+## Ringkasan
+
+| # | Tanggal | Commit | Perubahan singkat | Dampak bisnis |
+|---|---------|--------|-------------------|---------------|
+| 1 | 2026-11-03 | `07e5afb5` + merge `eaaf7af9` | Kubikasi terisi otomatis dari hasil scan OCR surat jalan | Input lebih cepat, salah ketik berkurang |
+| 2 | 2026-11-03 | `e6168b05` | Tarif & biaya tambahan diambil dari database | Harga mengikuti master tarif, tidak lagi angka tetap di kode |
+| 3 | 2026-11-04 | `2cd9f93c` | Rute (kode ops) khusus akun kini mempertimbangkan berat | Akun dengan rute berbeda per tier berat terlayani dengan benar |
+| 4 | 2026-11-04 | `33db7799` | Packing kayu, bubble & surcharge berat ikut aturan database | Biaya packing konsisten dengan kebijakan tarif per akun/layanan |
+| 5 | 2026-11-05 | `1b70118f` | Perbaikan format angka kubikasi dari OCR (titik → koma) | Kalkulasi charged weight korporat kini akurat |
+
+### Alur kalkulasi setelah semua perubahan
+
+```mermaid
+flowchart TD
+    A[Scan OCR surat jalan] -->|autofill kubikasi| B[Daftar Koli]
+    B --> C[Hitung Charged Weight]
+    C --> D[whnGetRouteListByAccV2<br/>rute akun + tier berat]
+    D -->|tidak ada| E[Fallback whnPriceListBaru<br/>rute standar]
+    D --> F[whnPriceListBaru<br/>biaya kirim]
+    E --> F
+    F --> G[whnPriceListAdditional<br/>aturan biaya tambahan per akun & layanan]
+    G --> H1[Asuransi ASVC-INS]
+    G --> H2[Pickup ASVC-PIC]
+    G --> H3[Realokasi ASVC-PKR/RLC]
+    G --> H4{Ada Packing?}
+    H4 -->|Ya| P1[Kayu ASVC-PKW]
+    H4 -->|Ya| P2[Bubble ASVC-PKB]
+    H4 -->|Ya| P3[Surcharge ASVC-SCG]
+    H1 & H2 & H3 & P1 & P2 & P3 --> T[Total Biaya]
+```
+
+---
+
+## 1. Autofill Kubikasi dari OCR — `07e5afb5` · 2026-11-03
 
 **Kondisi awal:** Hasil scan OCR sudah membaca surat jalan, tapi kolom kubikasi di daftar koli masih diisi manual. Koli tambahan (multi-koli) juga tidak ikut terisi.
 
@@ -48,7 +52,7 @@
 
 ---
 
-## 2. Integrasi Query Tarif & Biaya Tambahan — `e6168b05`
+## 2. Integrasi Query Tarif & Biaya Tambahan — `e6168b05` · 2026-11-03
 
 **Kondisi awal:**
 - Biaya kirim diambil dari query `whnPriceListNew` dengan parameter ganda (`berat`, `biid`, `btp01`… dan `ATRB*`).
@@ -69,7 +73,7 @@
 
 ---
 
-## 3. Rute Kode Ops Berbasis Berat — `2cd9f93c`
+## 3. Rute Kode Ops Berbasis Berat — `2cd9f93c` · 2026-11-04
 
 **Kondisi awal:** Rute khusus akun diambil dari `whnGetRouteListByAcc` tanpa informasi berat.
 
@@ -79,16 +83,16 @@
 
 ```mermaid
 flowchart LR
-    A[Akun X, Jakarta → Surabaya] --> B{Charged weight}
-    B -->|< 100 kg| R1[Rute reguler]
-    B -->|≥ 100 kg| R2[Rute kargo/darat]
+    A["Akun X, Jakarta → Surabaya"] --> B{Charged weight}
+    B -->|"< 100 kg"| R1[Rute reguler]
+    B -->|">= 100 kg"| R2[Rute kargo/darat]
 ```
 
 *Contoh tier di atas hanya ilustrasi. Batas sebenarnya diatur di database.*
 
 ---
 
-## 4. Packing Kayu, Bubble & Surcharge dari Database — `33db7799`
+## 4. Packing Kayu, Bubble & Surcharge dari Database — `33db7799` · 2026-11-04
 
 **Kondisi awal:**
 - Packing kayu = `max(berat × 2.000, 15.000)` per koli, bubble = `max(keliling × 2.500, 2.500)`, surcharge otomatis untuk koli > 50 kg. Semua angka hardcode.
@@ -106,6 +110,7 @@ flowchart LR
 
 **Contoh kasus surcharge (ilustrasi):** 2 koli @60 kg, biaya kirim Rp10.000/kg, aturan `ASVC-SCG`: rentang 50 kg–∞, tarif 1.
 `ceil(60) × 1 × 10.000 = 600.000` per koli × 2 koli = **Rp1.200.000**
+
 > ⚠️ Perhatikan: sekarang `grossWeight` per baris koli dianggap **berat per koli**. Kode lama membaginya dengan jumlah koli.
 
 **Contoh pilihan "Tanpa":**
@@ -114,6 +119,32 @@ flowchart LR
 |-----------|---------|---------|
 | Pilih `Tanpa`, lalu centang `Asuransi` | tetap `[Tanpa]` | `[Asuransi]` |
 | Pilih `Asuransi`, lalu centang `Tanpa` | `[Tanpa]` | `[Tanpa]` |
+
+---
+
+## 5. Perbaikan Format Kubikasi OCR — `1b70118f` · 2026-11-05
+
+**Kondisi awal:** Autofill kubikasi dari OCR sudah berjalan (commit `07e5afb5`), tapi format angka dari hasil scan belum ditangani dengan benar.
+
+**Masalah:** OCR membaca angka kubikasi dari cetakan surat jalan dalam format ribuan bertitik, misalnya `2.000` (artinya 2.000 cm³). Saat disimpan ke kolom kubikasi dan dibaca oleh formula:
+- `parseFloat("2.000")` di JavaScript mengembalikan `2`, bukan `2000` — titik dianggap tanda desimal.
+- Rumus charged weight `(kubikasi / 4000) * koli` menjadi `(2 / 4000) = 0.0005`, padahal seharusnya `(2000 / 4000) = 0.5`.
+- Berlaku untuk koli pertama maupun koli tambahan (multi-koli).
+
+**Solusi:**
+- Tambah method helper `formatKubikasiOcr()` (line 2636–2647): mengekstrak token angka dari string OCR, membuang tanda titik pemisah ribuan, dan mengembalikan format koma (contoh: `2,000`).
+- Perbaiki parsing formula di `setKubikasiWithoutRounded()` (line 2815–2822): deteksi titik-tanpa-koma sebagai pemisah ribuan sebelum `parseFloat`, sehingga `"2.000"` dibaca sebagai `2000`, bukan `2`.
+
+**Contoh kasus:**
+
+| Input OCR | Tampil di kolom koli | Nilai masuk formula |
+|-----------|----------------------|---------------------|
+| `"2.000"` | `2,000` | `2000` |
+| `"12.500"` | `12,500` | `12500` |
+| `2000` *(number)* | `2,000` | `2000` |
+| `"2.000 cm3"` | `2,000` | `2000` |
+
+**Dampak bisnis:** Kalkulasi berat kubikasi dan charged weight korporat kini akurat untuk pengiriman dengan volume besar yang sebelumnya bisa under-charge secara signifikan.
 
 ---
 
