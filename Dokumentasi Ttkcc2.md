@@ -53,7 +53,7 @@ Modul ini berinteraksi dengan basis data melalui wrapper query DCAF (`loadQuery`
 |---|---|---|
 | **`whnPriceListBaru`** / **`whnPriceListNew`** | Menghitung biaya kirim dasar, SLA (*maxtm*), dan kode operasional.<br>Param: `ATRBIID`, `ATRBTP01`, `ATRBTP02`, `ATRBTQTY` | Menggunakan berat kirim final (`chargedWeight`). |
 | **`whnGetRouteListByAccV2`** | Mengambil kode rute operasional / Route Code.<br>Param: `ATRBAID`, `ATRBIID`, `ATRBTP01`, `ATRBTP02` | Mengisi kode ops (misal `000` / `JKT-SUB`). |
-| **`whnPriceListAdditional`** | Mengambil aturan biaya tambahan murni dari database.<br>Param: `baid` (Account), `biid` (Layanan) | Menghasilkan aturan tarif Asuransi, Pickup, Realokasi, Packing Kayu, Packing Bubble, Surcharge. |
+| **`whnPriceListAdditional`** | Mengambil aturan biaya tambahan dari database.<br>Param: `baid` (Account), `biid` (Layanan) | Menghasilkan aturan tarif Asuransi, Pickup, Realokasi, Packing Kayu, Packing Bubble, Surcharge. |
 | **`RELBIBT_TTKC`** | Mengambil daftar Layanan yang tersedia untuk Account tertentu.<br>Param: `ATRBAIDP` | Mengisi opsi dropdown Layanan. |
 | **`pllvWilayahBEAD`** | Pencarian data wilayah / kota untuk Asal dan Tujuan.<br>Param: `search`, `d-limit` | Digunakan pada autocomplete dan modal lookup. |
 | **`pllv_shiptoaddr`** | Daftar alamat tersimpan milik partner korporat (*Ship-To*).<br>Param: `ATRBAIDP` | Mengisi opsi dropdown Ship-To Address. |
@@ -92,7 +92,7 @@ Setiap perubahan pada tabel koli (`listKoli`) otomatis memicu method `setKubikas
 
 ### 4.2. Formula Biaya Tambahan (`whnPriceListAdditional`)
 
-Semua biaya tambahan dihitung **100% murni dari database** tanpa nilai fallback hardcode:
+Semua biaya tambahan dihitung dari database :
 
 ```
 Aturan Database (whnPriceListAdditional):
