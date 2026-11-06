@@ -18,8 +18,11 @@ Halaman ini merupakan modernisasi dari formulir legasi DCAF/DW:
   - Penentuan berat tagihan (*charged weight*) berbasis nilai maksimal antara akumulasi berat kotor dan akumulasi kubikasi.
   - Perhitungan biaya kirim dan biaya tambahan murni 100% dari database via query `whnPriceListAdditional`.
 
-#### 📄 Dokumen Terkait
- [Changelog](docs/changelog.md):  Riwayat perubahan per commit (kondisi awal, masalah, solusi, contoh kasus) dan daftar risiko yang perlu ditindaklanjuti 
+#### Dokumen Terkait
+- [Rencana Implementasi Fitur Save + List TTKCC2](docs/rencana-implementasi-save.md): Panduan lengkap eksekusi dua developer (Frontend & Backend), API contract, kode controller Perl DCAF, query SQL EDBQ, dan komponen Vue 2.
+- [Analisis Alur Save TTKCC Legasi ke DCAF](docs/analisis-save-ttkcc.md): Analisis mendalam alur form CRUD DW sandbox, pemetaan kolom tabel ENTBT, dan perbedaan arsitektur DW vs DCAF.
+- [Missing Parts](docs/missing-parts.md): Rincian logika bisnis, rumus tiering biaya tambahan, dan fitur yang belum diimplementasikan di TTKCC2.vue.
+- [Changelog](docs/changelog.md): Riwayat perubahan per commit dan catatan migrasi. 
 
 ---
 
