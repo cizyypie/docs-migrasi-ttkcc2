@@ -1,8 +1,8 @@
-# Rencana Implementasi: Fitur Save + List TTKCC2
+# Rencana Implementasi: Fitur Save + List TTKCC2 (Diselaraskan dengan Rules .agents & .ai)
 
 > [!IMPORTANT]
 > Dokumen ini adalah panduan teknis dan eksekusi dua developer yang bekerja paralel.
-> Baca seluruh dokumen sebelum mulai coding. Sepakati API Contract di Bagian 2 dan Klasifikasi Query di Bagian 1.3 terlebih dahulu.
+> Seluruh isi dokumen ini telah diselaraskan 100% dengan aturan terbaru pada `.agents/rules/` (`01` s/d `05`), `.agents/GEMINI.md`, dan `.ai/`.
 > Aturan proyek: Dilarang menggunakan emoticon / emoji dalam kode, query SQL, maupun dokumentasi.
 
 ---
@@ -20,7 +20,14 @@
    - 2.3 [Get Detail TTK (`GET /a/ttkcc/getTTKCC/{btid}`)](#23-get-detail-ttk)
 3. [Pembagian Kerja](#3-pembagian-kerja)
 4. [Dev A — Frontend](#4-dev-a--frontend)
+   - 4.1 [Modifikasi `TTKCC2.vue`](#41-modifikasi-ttkcc2vue)
+   - 4.2 [Buat File Baru `PVwTTKCCLs.vue`](#42-buat-file-baru-pvwttkcclsvue)
+   - 4.3 [Registrasi Route di `routes.js`](#43-registrasi-route-di-webdevdcafsrcrouterroutesjs)
 5. [Dev B — Backend](#5-dev-b--backend)
+   - 5.1 [Buat Controller `TTKCC.pm`](#51-buat-controller-libperldcafcontrollerttkccpm)
+   - 5.2 [Definisi SQL Query EDBQ & EDBQP (Aturan 253)](#52-definisi-sql-query-edbq--edbqp-aturan-253)
+   - 5.3 [Spesifikasi OpenAPI `ttkcc.yaml`](#53-buat-file-spesifikasi-etcapittkccyaml)
+   - 5.4 [Registrasi Gateway `dcaf.yaml`](#54-registrasi-endpoint-di-etcdcafyaml)
 6. [Urutan Eksekusi & Checkpoint](#6-urutan-eksekusi--checkpoint)
 7. [Hal Kritis & Catatan Verifikasi](#7-hal-kritis--catatan-verifikasi)
 
@@ -32,13 +39,13 @@
 
 | Fitur | Keterangan |
 |-------|------------|
-| Tombol Save di TTKCC2 | Tombol hijau di kanan atas toolbar, mirip tombol Save pada sandbox DW |
+| Tombol Save di TTKCC2 | Tombol hijau di kanan atas toolbar form `TTKCC2.vue` |
 | Validasi form sebelum save | Cek field wajib, cek kelengkapan data & kalkulasi tarif |
 | Konfirmasi dialog | Dialog pop-up: "Are you sure to CREATE new record?" (sama persis dengan sandbox DW) |
 | Loading overlay saat proses | "Creating data..." overlay saat HTTP request berlangsung |
 | Notifikasi hasil | Banner / popup sukses dengan nomor TTK baru atau pesan gagal |
-| Reset & feedback form | Nomor TTK tampil di chip hijau atas, siap cetak atau buat baru |
-| Halaman List TTK (`TTKCCList.vue`) | Tabel daftar riwayat TTK corporate kubikasi yang telah tersimpan |
+| Reset & feedback form | Nomor TTK tampil di chip hijau atas, siap cetak resi / buat baru |
+| Halaman List TTK (`PVwTTKCCLs.vue`) | Tabel daftar riwayat TTK corporate kubikasi yang telah tersimpan |
 | Filter data list | Filter berdasarkan rentang tanggal, Account corporate, dan status |
 | Navigasi detail | Klik baris nomor TTK membuka halaman TTKCC2 dalam mode referensi / detail |
 
@@ -49,67 +56,60 @@
 | File | Pemilik | Status | Deskripsi |
 |------|---------|--------|-----------|
 | `web/dev/dcaf/src/pages/TTKCC2.vue` | Dev A | Dimodifikasi | Tambah tombol Save, konfirmasi, method save & payload builder |
-| `web/dev/dcaf/src/pages/TTKCCList.vue` | Dev A | **File Baru** | Halaman daftar data TTK, filter, dan tabel riwayat |
-| `web/dev/dcaf/src/router/routes.js` | Dev A | Dimodifikasi | Registrasi route `/TTKCCList` (1 baris) |
+| `web/dev/dcaf/src/pages/PVwTTKCCLs.vue` | Dev A | **File Baru** | Halaman daftar data TTK, filter, dan tabel riwayat (standar `PVw...Ls`) |
+| `web/dev/dcaf/src/router/routes.js` | Dev A | Dimodifikasi | Registrasi route `/PVwTTKCCLs` (1 baris) |
 | `lib/perl/DCAF/Controller/TTKCC.pm` | Dev B | **File Baru** | Controller API DCAF: operasi `createTTKCC`, `listTTKCC`, `getTTKCC` |
 | `etc/api/ttkcc.yaml` | Dev B | **File Baru** | OpenAPI 3.0 specification untuk routing DCAF |
 | `etc/dcaf.yaml` | Dev B | Dimodifikasi | Registrasi route modul `ttkcc` ke DCAF gateway (1 baris) |
-| `lib/db/git/dcaf-data.sql` | Dev B | Dimodifikasi | Menambahkan 4 query SQL baru ke tabel `EDBQ` |
-
-> [!NOTE]
-> Pembagian kerja zero overlap. Masing-masing developer bekerja di file terpisah, sehingga tidak terjadi conflict saat pengerjaan paralel.
+| `lib/db/git/dcaf-data.sql` | Dev B | Dimodifikasi | Menambahkan query SELECT baru (`253xxx`) ke tabel `EDBQ` dan `EDBQP` |
 
 ---
 
 ### 1.3 Analisis & Klasifikasi Query Database (Existing vs Baru)
 
-Sistem SWB DCAF tidak mengizinkan penulisan raw SQL di dalam file Perl (`.pm`). Semua query harus terdaftar di tabel database `EDBQ` dan dieksekusi menggunakan method `$ros->q2j('queryName', ...)`.
+Sistem SWB DCAF tidak mengizinkan penulisan raw SQL di dalam file Perl (`.pm`). Semua query harus terdaftar di tabel database `EDBQ` dan dieksekusi menggunakan method `$ros->q2j('queryName', ...)` atau `DCAF::Query`.
 
-Berdasarkan analisis menyeluruh terhadap form `TTKCC2.vue`, form CRUD sandbox DW lama (`fnm.50180000ENTBT_m_TTKCC2`), serta daftar query di `lib/db/git/dcaf-data.sql`:
+Sesuai aturan di `.agents/rules/03-database-rules.md`:
 
-#### A. Query Form Input / Kalkulasi (0 Query Baru — Semua Sudah Ada)
-Seluruh query yang digunakan pada form `TTKCC2.vue` saat ini **SUDAH ADA** di database dan sudah aktif berjalan:
+#### A. Query Form Input & Lookup (0 Query Baru — Semua Sudah Ada)
+1. `whnPriceListBaru` — Hitung tarif dasar. Sudah ada.
+2. `whnPriceListAdditional` — Hitung tarif surcharge & packing. Sudah ada.
+3. `whnGetRouteListByAccV2` — Dropdown rute layanan berdasarkan account. Sudah ada.
+4. `RELBIBT_TTKC` — Dropdown tipe layanan TTK Corporate. Sudah ada.
+5. `RELBABTP_AccountActive` — Autocomplete pencarian account corporate. Sudah ada.
+6. `pllvWilayahBEAD` — Autocomplete wilayah asal dan tujuan. Sudah ada.
+7. `pllv_shiptoaddr` — Dropdown alamat shipto supplier / penerima. Sudah ada.
+8. `RELBEBANKBTP` — Dropdown data bank account. Sudah ada.
+9. `pllv_dokkembali` — Dropdown pilihan dokumen bukti kembali. Sudah ada.
 
-1. `whnPriceListBaru` — Query hitung tarif dasar (asal, tujuan, layanan, account). Sudah ada.
-2. `whnPriceListAdditional` — Query tarif tambahan (surcharge & packing). Sudah ada.
-3. `whnGetRouteListByAccV2` — Query dropdown rute layanan berdasarkan account. Sudah ada.
-4. `RELBIBT_TTKC` — Query dropdown tipe layanan TTK Corporate. Sudah ada.
-5. `RELBABTP_AccountActive` — Query autocomplete pencarian account corporate. Sudah ada.
-6. `pllvWilayahBEAD` — Query autocomplete wilayah asal dan tujuan. Sudah ada.
-7. `pllv_shiptoaddr` — Query dropdown alamat shipto supplier / penerima. Sudah ada.
-8. `RELBEBANKBTP` — Query dropdown data bank account. Sudah ada.
-9. `pllv_dokkembali` — Query dropdown pilihan dokumen bukti kembali. Sudah ada.
+#### B. Query INSERT ENTBT (0 Query Baru — WAJIB Menggunakan Generic Query)
+* **Aturan `03-database-rules.md` Baris 341:**
+  > `entbtCreate` (ID `253005`) adalah generic insert ke `ENTBT` di DB `ta15_wlogisticsidb_ap` (connection 3). Gunakan untuk setiap insert baru ke `ENTBT`, dilarang membuat query INSERT baru.
+* **Keputusan:**
+  Operasi simpan Header TTK dan Child Koli **WAJIB memakai `entbtCreate`**. Parameter yang dikirimkan adalah nama kolom `ENTBT`.
 
-**Kesimpulan Form:** Untuk halaman form input TTKCC2, **TIDAK ADA query baru** yang perlu dibuat.
+#### C. Query Baru yang Wajib Didaftarkan (Hanya 2 Query SELECT Baru)
+Mengikuti **The 253 Query ID Rule** (ID di rentang `253000` - `253999`), serta mendaftarkan seluruh parameter ke `EDBQP`:
 
-#### B. Query yang Wajib Dibuat untuk Backend Save & List (Total: 4 Query Baru)
-Pada aplikasi lama (sandbox DW), aksi simpan dilakukan melalui submit form HTML standar ke `dw.cgi` (`fnm.50180000ENTBT`), yang ditangani internal oleh engine DW tanpa nama query EDBQ tersendiri. Di arsitektur modern SWB, proses simpan dilakukan via endpoint API DCAF (`POST /a/ttkcc/createTTKCC`).
-
-Oleh karena itu, Dev B wajib menambahkan **4 query baru** ke dalam tabel `EDBQ`:
-
-| No | Nama Query | Tipe | Tujuan Penggunaan | Keterangan |
-|----|------------|------|-------------------|------------|
-| 1 | `ttkccCreateHeader` | INSERT | Simpan data induk (Header TTK) ke tabel `ENTBT` | Dipanggil oleh Controller `TTKCC.pm` saat Save |
-| 2 | `ttkccGetNomor` | SELECT | Ambil nomor TTK (`ATRBTNO`) yang terbentuk berdasarkan ID header (`ATRBTID`) | Dipanggil setelah Header berhasil di-insert |
-| 3 | `ttkccCreateKoli` | INSERT | Simpan setiap rincian koli (Child Record) ke tabel `ENTBT` | Dipanggil secara berulang (loop) sesuai jumlah baris koli |
-| 4 | `ttkccListHeader` | SELECT | Ambil daftar TTK dengan filter tanggal, account, status, limit, dan offset | Dipanggil oleh Controller untuk halaman `TTKCCList.vue` |
-
-*(Catatan: Query `ttkccGetHeader` dan `ttkccGetKoli` dapat ditambahkan sebagai query pendukung jika fitur detail modal / view mode dibuka pada fase integrasi).*
+| No | Nama Query | ID EDBQ | Tipe | Tujuan Penggunaan |
+|----|------------|---------|------|-------------------|
+| 1 | `ttkccGetNomor` | `253006` | SELECT | Ambil nomor TTK (`ATRBTNO`) berdasarkan `ATRBTID` |
+| 2 | `ttkccListHeader` | `253007` | SELECT | Daftar riwayat TTK header dengan filter tanggal, account, dan status untuk `PVwTTKCCLs.vue` |
 
 ---
 
 ### 1.4 Pemetaan Kolom Database ENTBT Terverifikasi
 
-Berdasarkan inspeksi langsung terhadap struktur form sandbox DW (`fnm.50180000ENTBT_m_TTKCC2`) dan subform koli (`5018135703`), berikut adalah pemetaan field form ke kolom database `ENTBT` yang telah terverifikasi:
-
-#### Tabel 1: Header TTK (Form `f5018005322`)
-| Kolom ENTBT | Tipe / Format | Field Form TTKCC2 / Payload | Keterangan di Sandbox DW |
-|-------------|---------------|-----------------------------|--------------------------|
+#### Tabel 1: Header TTK (Disimpan via `entbtCreate`)
+| Kolom ENTBT | Tipe Data | Field Payload Form TTKCC2 | Keterangan |
+|-------------|-----------|---------------------------|------------|
+| `ATRBAIDO` | Integer | (Default 3002) | ID Cabang Origin / Owner Account |
+| `ATRBAIDM` | Integer | (Session User / Default 1) | ID User Pembuat Transaksi |
 | `ATRBTTYID` | Integer | (Konstan 5001) | Tipe Transaksi TTK Corporate |
 | `ATRBTDT` | Date | `tanggal` | Tanggal Pengiriman |
 | `ATRBAIDP` | Integer | `accountId` | ID Account Corporate |
 | `ATRBIID` | Integer | `layananId` | ID Layanan Pengiriman |
-| `ATRBTNOG` | String | `referensi` | Nomor TTK Manual / Referensi |
+| `ATRBTNOG` | String | `referensi` | Nomor TTK Manual / Ref PO / DN |
 | `ATRBTP18` | Integer | `printer` | Format Label Printer (102=Thermal, 103=Kecil, 104=Besar) |
 | `ATRBTP21` | Integer | `adaPacking` | Flag Ada Packing/Surcharge (1=Ya, 2=Tidak) |
 | `ATRBTP24` | Integer | `buktiKembali` | Bukti Dokumen Kembali (100=Tidak Perlu, 101, dst) |
@@ -140,32 +140,38 @@ Berdasarkan inspeksi langsung terhadap struktur form sandbox DW (`fnm.50180000EN
 | `ATRBTP05` | String | `catatan` | Catatan Instruksi Pengiriman |
 | `ATRBTP17` | Integer | `maxtm` | Estimasi Lead Time (Hari) |
 | `ATRBTSS` | Integer | (Default 1) | Status Transaksi (1 = Baru) |
+| `ATRBTBS` | Integer | (Default 1) | Status Bisnis |
+| `ATRBTDTP` | DateTime | (NOW()) | Tanggal Posting |
 
-#### Tabel 2: Child Koli (Subform `5018135703`)
-| Kolom ENTBT | Tipe / Format | Properti Item Koli | Keterangan di Sandbox DW |
-|-------------|---------------|-------------------|--------------------------|
+#### Tabel 2: Child Koli (Disimpan via `entbtCreate` per baris koli)
+| Kolom ENTBT | Tipe Data | Properti Item Koli | Keterangan |
+|-------------|-----------|-------------------|------------|
+| `ATRBAIDO` | Integer | (Default 3002) | ID Cabang Origin / Owner Account |
+| `ATRBAIDM` | Integer | (Session User / Default 1) | ID User Pembuat Transaksi |
 | `ATRBTTYID` | Integer | (Konstan 5001) | Tipe Transaksi TTK Corporate |
+| `ATRBAIDP` | Integer | `accountId` | Mengikuti ID Account Header |
 | `ATRBTIDP` | Bigint | `parentBtid` | Relasi ke ID Header (`ENTBT.ATRBTID`) |
 | `ATRBTNO` | String | `nomor` | Nomor TTK yang sama dengan header |
+| `ATRBTDT` | Date | `tanggal` | Mengikuti tanggal header |
 | `ATRBTP16` | Integer | `koli` | Nomor urut koli (Koli ke-1, 2, dst) |
 | `ATRBTQTY` | Decimal | `grossWeight` | Berat Kotor Koli (KG) |
 | `ATRBTP12` | String | `volumetrik` | Dimensi Volumetrik Koli (P x L x T) |
 | `ATRBTP22` | Decimal | `kubikasi` | Volume Kubikasi Koli (M3) |
-| `ATRBTP04` | Tinyint (0/1) | `isBubble` | Checkbox Penggunaan Bubble Wrap |
-| `ATRBTP19` | Tinyint (0/1) | `isKayu` | Checkbox Penggunaan Packing Kayu |
+| `ATRBTP04` | Tinyint | `isBubble` | Checkbox Bubble Wrap (1=Ya, 0=Tidak) |
+| `ATRBTP19` | Tinyint | `isKayu` | Checkbox Packing Kayu (1=Ya, 0=Tidak) |
 | `ATRBTP13` | String | `jenisBarang` | Nama / Jenis Barang Spesifik Koli |
-| `ATRBTCMT` | String | `catatan` | Catatan Khusus untuk Koli Tersebut |
-| `ATRBTP20` | Decimal | `beratSurcharge` | Berat Barang yang Terkena Surcharge (KG) |
+| `ATRBTCMT` | String | `catatan` | Catatan Khusus Koli |
+| `ATRBTP20` | Decimal | `beratSurcharge` | Berat Kena Surcharge Koli (KG) |
 | `ATRBTP21` | Decimal | `biayaSurcharge` | Nominal Biaya Surcharge Koli |
 | `ATRBTP23` | Decimal | `biayaPacking` | Nominal Biaya Packing Kayu Koli |
-| `ATRBTP24` | Decimal | `biayaPackingBubble` | Nominal Biaya Packing Bubble Wrap Koli |
+| `ATRBTP24` | Decimal | `biayaPackingBubble`| Nominal Biaya Packing Bubble Wrap Koli |
+| `ATRBTSS` | Integer | (Default 1) | Status Transaksi (1 = Baru) |
+| `ATRBTBS` | Integer | (Default 1) | Status Bisnis |
+| `ATRBTDTP` | DateTime | (NOW()) | Tanggal Posting |
 
 ---
 
 ## 2. API Contract — Wajib Disepakati Dulu
-
-> [!WARNING]
-> Kontrak JSON ini mengikat antara Frontend (Dev A) dan Backend (Dev B). Jika terdapat perubahan nama variabel atau struktur payload, kedua pihak harus memperbarui dokumen ini sebelum eksekusi.
 
 ### 2.1 Create TTK
 
@@ -239,17 +245,8 @@ Authorization: Bearer <token>
   "message": "TTK berhasil dibuat",
   "data": {
     "btid": 123456789,
-    "nomor": "50180000ENTBT-20261106-001"
+    "nomor": "15656747607"
   }
-}
-```
-
-**Response Gagal (HTTP 400 / 500):**
-```json
-{
-  "code": 1,
-  "status": "failed",
-  "message": "Missing required fields: accountId, asalId, tujuanId"
 }
 ```
 
@@ -263,15 +260,12 @@ Authorization: Bearer <token>
 ```
 
 **Query Parameters:**
-
-| Parameter | Tipe | Wajib | Keterangan |
-|-----------|------|-------|------------|
-| `tanggalDari` | String (YYYY-MM-DD) | Tidak | Batas awal tanggal pengiriman |
-| `tanggalSampai` | String (YYYY-MM-DD) | Tidak | Batas akhir tanggal pengiriman |
-| `accountId` | Integer | Tidak | Filter berdasarkan ID account corporate |
-| `status` | Integer | Tidak | Filter status transaksi (1=Baru, dll) |
-| `d-limit` | Integer | Tidak | Jumlah baris per halaman (default 25) |
-| `d-offset` | Integer | Tidak | Offset paginasi database |
+- `tanggalDari` (Date, optional)
+- `tanggalSampai` (Date, optional)
+- `accountId` (Integer, optional)
+- `status` (Integer, optional)
+- `d-limit` (Integer, default 25)
+- `d-offset` (Integer, default 0)
 
 **Response Sukses (HTTP 200):**
 ```json
@@ -283,7 +277,7 @@ Authorization: Bearer <token>
     "body": [
       {
         "btid": 123456789,
-        "nomor": "50180000ENTBT-20261106-001",
+        "nomor": "15656747607",
         "tanggal": "2026-11-06",
         "account": "2100081011: Astra International",
         "asal": "Jawa Barat, Kab. Bekasi",
@@ -309,65 +303,24 @@ GET /a/ttkcc/getTTKCC/{btid}
 Authorization: Bearer <token>
 ```
 
-**Response Sukses (HTTP 200):**
-```json
-{
-  "code": 0,
-  "status": "success",
-  "message": "Successful",
-  "data": {
-    "header": {
-      "btid": 123456789,
-      "nomor": "50180000ENTBT-20261106-001",
-      "tanggal": "2026-11-06",
-      "accountId": 188889202,
-      "account": "2100081011: Astra International",
-      "layananId": 7,
-      "layanan": "AISHELL-N",
-      "asalId": 3216,
-      "asal": "Jawa Barat, Kab. Bekasi",
-      "tujuanId": 3171,
-      "tujuan": "DKI Jakarta, Kota Jakarta Selatan",
-      "grossWeight": 26,
-      "chargedWeight": 26,
-      "koli": 1,
-      "total": 44200,
-      "namaPenerima": "PT JAYA ABADI",
-      "alamat": "Kawasan Industri MM2100 Blok B2",
-      "kodeOps": "077-159-786-150-700-169-626",
-      "status": 1
-    },
-    "koli": [
-      {
-        "btid": 123456790,
-        "koli": 1,
-        "grossWeight": 26,
-        "volumetrik": "0 x 0 x 0",
-        "kubikasi": 1
-      }
-    ]
-  }
-}
-```
-
 ---
 
 ## 3. Pembagian Kerja
 
 ```
 [TAHAP 1: ALIGNMENT]
-Sepakati API Contract & Pemetaan Kolom ENTBT.
+Sepakati API Contract & Konfirmasi Pemetaan Kolom ENTBT.
 
-         |--------------------------------|
-         |                                |
-         v                                v
-  [Dev A - Frontend]              [Dev B - Backend]
-  1. Tombol & Validasi Save       1. Tambah 4 Query EDBQ
-  2. buildPayload & handleSave    2. Controller TTKCC.pm
-  3. Halaman TTKCCList.vue        3. OpenAPI ttkcc.yaml
-  4. Routing routes.js            4. Config dcaf.yaml
-         |                                |
-         |--------------------------------|
+         |------------------------------------|
+         |                                    |
+         v                                    v
+  [Dev A - Frontend]                  [Dev B - Backend]
+  1. Tombol & Validasi Save           1. Tambah Query 253006 & 253007
+  2. buildPayload & handleSave        2. Registrasi EDBQP & Flush Redis
+  3. Halaman PVwTTKCCLs.vue           3. Controller TTKCC.pm (entbtCreate)
+  4. Routing routes.js                4. OpenAPI ttkcc.yaml & dcaf.yaml
+         |                                    |
+         |------------------------------------|
          v
   [TAHAP 2: INTEGRATION TEST]
   Colokkan Frontend ke Backend API lokal dev.
@@ -381,52 +334,21 @@ Sepakati API Contract & Pemetaan Kolom ENTBT.
 
 ### 4.1 Modifikasi `TTKCC2.vue`
 
-#### A1. Tambah State Baru di `data()`
-Tambahkan pada return object `data()`:
+Tambahkan state, computed, method, dan tombol Save di toolbar atas:
+
 ```javascript
-// Save state
+// data()
 isSaving: false,
 savedNomor: '',
-```
 
-#### A2. Tambah Computed `isReadyToSave`
-Tambahkan di blok `computed:`:
-```javascript
+// computed:
 isReadyToSave () {
   return this.isDataLengkap && this.isPricingComplete && !this.isSaving
 },
 ```
 
-#### A3. Tambah Tombol Save di Template
-Letakkan di toolbar kanan atas sejajar dengan tab navigasi:
-```html
-<div class="row items-center q-gutter-x-sm">
-  <q-chip
-    v-if="savedNomor"
-    color="positive"
-    text-color="white"
-    icon="check_circle"
-    :label="savedNomor"
-  />
-  <q-btn
-    color="positive"
-    label="Save"
-    icon="save"
-    :disable="!isReadyToSave"
-    :loading="isSaving"
-    unelevated
-    @click="handleSave"
-  >
-    <q-tooltip v-if="missingFields.length">
-      Belum lengkap: {{ missingFields.join(', ') }}
-    </q-tooltip>
-  </q-btn>
-</div>
-```
-
-#### A4. Tambah Method `handleSave()` dan `buildPayload()`
-Tambahkan di dalam blok `methods:`:
 ```javascript
+// methods:
 async handleSave () {
   if (!this.isDataLengkap) {
     this.$q.dialog({
@@ -498,307 +420,25 @@ async handleSave () {
     this.isSaving = false
     this.$q.loading.hide()
   }
-},
-
-buildPayload () {
-  const f = this.form
-  const getVal = (opt) => {
-    if (!opt) return null
-    if (typeof opt === 'object') return opt.value !== undefined ? opt.value : opt.id
-    return opt
-  }
-
-  return {
-    tanggal:         f.tanggal,
-    accountId:       getVal(f.account),
-    layananId:       f.layanan,
-    referensi:       f.referensi || '',
-    adaPacking:      parseInt(f.adaPacking) || 2,
-    printer:         parseInt(f.printer) || 102,
-    buktiKembali:    parseInt(f.buktiKembali) || 100,
-    asalId:          getVal(f.asal),
-    tujuanId:        getVal(f.tujuan),
-    grossWeight:     parseFloat(f.grossWeight) || 0,
-    chargedWeight:   parseFloat(f.chargedWeight) || 0,
-    koli:            parseInt(f.koli) || 1,
-    volumetrik:      f.volumetrik || '',
-    kubikasi:        parseFloat(f.kubikasi) || 0,
-    barang:          f.barang || '',
-    hargaBarang:     parseFloat(f.hargaBarang) || 0,
-    biayaTambahan:   parseInt(f.biayaTambahan) || 100,
-    namaPenerima:    typeof f.namaPenerima === 'object' && f.namaPenerima
-                       ? (f.namaPenerima.label || f.namaPenerima)
-                       : (f.namaPenerima || ''),
-    telepon:         f.teleponPenerima || '',
-    alamat:          f.alamatPenerima || '',
-    supplierId:      f.supplier || null,
-    kodeOps:         f.kodeOps || '',
-    maxtm:           parseInt(f.maxtm) || 0,
-    biayaKirimPerKg: parseFloat(f.biayaKirimPerKg) || 0,
-    biayaKirim:      parseFloat(f.biayaKirim) || 0,
-    biayaAsuransi:   parseFloat(f.biayaAsuransi) || 0,
-    biayaRealokasi:  parseFloat(f.biayaRealokasi) || 0,
-    biayaPickup:     parseFloat(f.biayaPickup) || 0,
-    biayaPacking:    parseFloat(f.biayaPacking) || 0,
-    packingBubble:   parseFloat(f.packingBubble) || 0,
-    biayaSurcharge:  parseFloat(f.biayaSurcharge) || 0,
-    biayaDiskon:     parseFloat(f.biayaDiskon) || 0,
-    total:           parseFloat(String(f.total || 0).replace(/,/g, '')) || 0,
-    catatan:         f.catatan || '',
-    listKoli: (this.listKoli || []).map(k => ({
-      koli:               parseInt(k.koli) || 1,
-      grossWeight:        parseFloat(k.grossWeight) || 0,
-      volumetrik:         k.volumetrik || '',
-      kubikasi:           parseFloat(k.kubikasi) || 0,
-      isBubble:           !!k.isBubble,
-      isKayu:             !!k.isKayu,
-      jenisBarang:        k.jenisBarang || '',
-      catatan:            k.catatan || '',
-      beratSurcharge:     parseFloat(k.beratSurcharge) || 0,
-      biayaSurcharge:     parseFloat(k.biayaSurcharge) || 0,
-      biayaPacking:       parseFloat(k.biayaPacking) || 0,
-      biayaPackingBubble: parseFloat(k.biayaPackingBubble) || 0
-    }))
-  }
 }
 ```
 
 ---
 
-### 4.2 Buat File Baru `TTKCCList.vue`
-**Path:** `web/dev/dcaf/src/pages/TTKCCList.vue`
+### 4.2 Buat File Baru `PVwTTKCCLs.vue`
+**Path:** `web/dev/dcaf/src/pages/PVwTTKCCLs.vue`
+*(Nama disesuaikan dengan konvensi standar `04-frontend-rules.md`: `PVw<Feature>Ls.vue`).*
 
-Halaman tabel yang memuat data daftar TTK hasil input, dilengkapi pencarian filter tanggal, account corporate, serta tombol aksi untuk membuka detail atau membuat TTK baru.
-
-```vue
-<template>
-  <q-page class="q-pa-md">
-    <!-- Header -->
-    <div class="row items-center justify-between q-mb-md">
-      <div class="text-h6 text-weight-bold">TTK Corporate Kubikasi — Daftar Transaksi</div>
-      <q-btn
-        color="positive"
-        label="Buat TTK Baru"
-        icon="add"
-        unelevated
-        :to="{ name: 'TTKCC2' }"
-      />
-    </div>
-
-    <!-- Filter Bar -->
-    <q-card flat bordered class="q-mb-md q-pa-sm">
-      <div class="row q-col-gutter-sm items-end">
-        <div class="col-12 col-md-3">
-          <div class="text-caption text-weight-bold q-mb-xs">Tanggal Dari</div>
-          <q-input dense outlined type="date" v-model="filter.tanggalDari" />
-        </div>
-        <div class="col-12 col-md-3">
-          <div class="text-caption text-weight-bold q-mb-xs">Tanggal Sampai</div>
-          <q-input dense outlined type="date" v-model="filter.tanggalSampai" />
-        </div>
-        <div class="col-12 col-md-4">
-          <div class="text-caption text-weight-bold q-mb-xs">Account Corporate</div>
-          <q-select
-            dense
-            outlined
-            v-model="filter.accountId"
-            :options="optionsAccount"
-            use-input
-            fill-input
-            hide-selected
-            input-debounce="400"
-            @filter="filterAccount"
-            clearable
-            placeholder="Cari nama atau kode account..."
-          />
-        </div>
-        <div class="col-12 col-md-2">
-          <q-btn
-            color="primary"
-            label="Cari"
-            icon="search"
-            unelevated
-            class="full-width"
-            :loading="loading"
-            @click="loadList"
-          />
-        </div>
-      </div>
-    </q-card>
-
-    <!-- Data Table -->
-    <q-table
-      flat
-      bordered
-      dense
-      :data="listData"
-      :columns="columns"
-      row-key="btid"
-      :loading="loading"
-      :pagination.sync="pagination"
-      @request="onRequest"
-      binary-state-sort
-    >
-      <template v-slot:body-cell-nomor="props">
-        <q-td :props="props">
-          <q-btn
-            flat
-            dense
-            no-caps
-            color="primary"
-            :label="props.value"
-            @click="bukaDetail(props.row)"
-          />
-        </q-td>
-      </template>
-
-      <template v-slot:body-cell-total="props">
-        <q-td :props="props" class="text-right">
-          Rp {{ formatNumber(props.value) }}
-        </q-td>
-      </template>
-
-      <template v-slot:body-cell-statusLabel="props">
-        <q-td :props="props">
-          <q-badge :color="statusColor(props.row.status)" :label="props.value" />
-        </q-td>
-      </template>
-
-      <template v-slot:no-data>
-        <div class="full-width text-center q-pa-lg text-grey-6">
-          <q-icon name="inbox" size="48px" /><br>
-          Belum ada data TTK yang ditemukan
-        </div>
-      </template>
-    </q-table>
-  </q-page>
-</template>
-
-<script>
-export default {
-  name: 'TTKCCList',
-
-  data () {
-    return {
-      loading: false,
-      listData: [],
-      optionsAccount: [],
-
-      filter: {
-        tanggalDari:   new Date().toISOString().slice(0, 10),
-        tanggalSampai: new Date().toISOString().slice(0, 10),
-        accountId:     null
-      },
-
-      pagination: {
-        sortBy:      'tanggal',
-        descending:  true,
-        page:        1,
-        rowsPerPage: 25,
-        rowsNumber:  0
-      },
-
-      columns: [
-        { name: 'nomor',       label: 'Nomor TTK',   field: 'nomor',       align: 'left',   sortable: true },
-        { name: 'tanggal',     label: 'Tanggal',     field: 'tanggal',     align: 'center', sortable: true },
-        { name: 'account',     label: 'Account',     field: 'account',     align: 'left' },
-        { name: 'asal',        label: 'Asal',        field: 'asal',        align: 'left' },
-        { name: 'tujuan',      label: 'Tujuan',      field: 'tujuan',      align: 'left' },
-        { name: 'koli',        label: 'Koli',        field: 'koli',        align: 'center' },
-        { name: 'berat',       label: 'Berat (KG)',  field: 'berat',       align: 'right' },
-        { name: 'total',       label: 'Total Tagihan', field: 'total',     align: 'right',  sortable: true },
-        { name: 'statusLabel', label: 'Status',      field: 'statusLabel', align: 'center' }
-      ]
-    }
-  },
-
-  mounted () {
-    this.loadList()
-  },
-
-  methods: {
-    async loadList () {
-      this.loading = true
-      try {
-        const params = {
-          tanggalDari:   this.filter.tanggalDari,
-          tanggalSampai: this.filter.tanggalSampai,
-          'accountId':   this.filter.accountId
-            ? (typeof this.filter.accountId === 'object' ? this.filter.accountId.value : this.filter.accountId)
-            : undefined,
-          'd-limit':     this.pagination.rowsPerPage,
-          'd-offset':    (this.pagination.page - 1) * this.pagination.rowsPerPage
-        }
-        const res = await this.$axios.get('/a/ttkcc/listTTKCC', { params })
-        if (res.data && res.data.code === 0) {
-          this.listData = res.data.data.body || []
-          this.pagination.rowsNumber = res.data.data.rows || 0
-        } else {
-          this.$q.notify({ type: 'negative', message: res.data.message || 'Gagal memuat data TTK' })
-        }
-      } catch (err) {
-        console.error('loadList error:', err)
-        this.$q.notify({ type: 'negative', message: 'Gagal menghubungi server' })
-      } finally {
-        this.loading = false
-      }
-    },
-
-    onRequest (props) {
-      const { page, rowsPerPage, sortBy, descending } = props.pagination
-      this.pagination.page = page
-      this.pagination.rowsPerPage = rowsPerPage
-      this.pagination.sortBy = sortBy
-      this.pagination.descending = descending
-      this.loadList()
-    },
-
-    async filterAccount (val, update) {
-      if (!val || val.length < 3) {
-        update(() => { this.optionsAccount = [] })
-        return
-      }
-      try {
-        const res = await this.$axios.get('query/RELBABTP_AccountActive', {
-          params: { search: val, 'd-limit': 50 }
-        })
-        const rows = (res.data && res.data.data && res.data.data.body) || []
-        update(() => {
-          this.optionsAccount = rows.map(item => ({
-            label: item.account || item.Account || item.code || item.id,
-            value: item.id || item.ID
-          }))
-        })
-      } catch (err) {
-        update(() => { this.optionsAccount = [] })
-      }
-    },
-
-    bukaDetail (row) {
-      this.$router.push({ name: 'TTKCC2', query: { btid: row.btid } })
-    },
-
-    formatNumber (val) {
-      if (!val && val !== 0) return '0'
-      return Number(val).toLocaleString('id-ID')
-    },
-
-    statusColor (status) {
-      const map = { 1: 'blue', 2: 'green', 3: 'orange', 9: 'red' }
-      return map[status] || 'grey'
-    }
-  }
-}
-</script>
-```
+File ini memuat tabel `q-table` riwayat TTK, form filter rentang tanggal, pencarian account, dan tombol pintas navigasi ke detail transaksi atau pembuatan transaksi baru.
 
 ---
 
 ### 4.3 Registrasi Route di `web/dev/dcaf/src/router/routes.js`
-Tambahkan route `TTKCCList`:
+
 ```javascript
+// TTK Corporate Kubikasi
 { name: 'TTKCC2', path: '/TTKCC2', component: () => import('pages/TTKCC2.vue') },
-{ name: 'TTKCCList', path: '/TTKCCList', component: () => import('pages/TTKCCList.vue') },
+{ name: 'PVwTTKCCLs', path: '/PVwTTKCCLs', component: () => import('pages/PVwTTKCCLs.vue') },
 ```
 
 ---
@@ -837,111 +477,121 @@ sub run {
         # ----------------------------------------------------------------
         $ros->{api}->{operation} eq 'createTTKCC' && do {
 
-            # 1. Validasi field wajib
+            # 1. Validasi field wajib di trust boundary
             my @missing;
-            push @missing, 'accountId'   unless $rhcp->{accountId};
-            push @missing, 'layananId'   unless $rhcp->{layananId};
-            push @missing, 'asalId'      unless $rhcp->{asalId};
-            push @missing, 'tujuanId'    unless $rhcp->{tujuanId};
+            push @missing, 'accountId'    unless $rhcp->{accountId};
+            push @missing, 'layananId'    unless $rhcp->{layananId};
+            push @missing, 'asalId'       unless $rhcp->{asalId};
+            push @missing, 'tujuanId'     unless $rhcp->{tujuanId};
             push @missing, 'namaPenerima' unless $rhcp->{namaPenerima};
-            push @missing, 'alamat'      unless $rhcp->{alamat};
-            push @missing, 'grossWeight' unless $rhcp->{grossWeight};
-            push @missing, 'koli'        unless $rhcp->{koli};
+            push @missing, 'alamat'       unless $rhcp->{alamat};
+            push @missing, 'grossWeight'  unless $rhcp->{grossWeight};
+            push @missing, 'koli'         unless $rhcp->{koli};
 
             if (@missing) {
                 $ros->{q}->{e}->{status} = 400;
                 $ros->{q}->{e}->{num}    = "$ros->{className}/createTTKCC/01";
-                $ros->{q}->{e}->{msg}    = 'Missing required fields: ' . join(', ', @missing);
+                $ros->{q}->{e}->{msg}    = 'Field wajib belum lengkap: ' . join(', ', @missing);
                 die;
             }
 
-            # 2. INSERT Header TTK (ENTBT)
+            # 2. INSERT Header TTK menggunakan Generic Query entbtCreate (253005)
+            my $ownerId = $ros->{q}->{session}->{user}->{ownerId} || 3002;
+            my $userId  = $ros->{q}->{session}->{user}->{accountId} || 1;
+
             my $roqHeader = DCAF::Query->new(
                 q    => $ros->{q},
-                name => 'ttkccCreateHeader',
+                name => 'entbtCreate',
                 data => {
-                    tanggal         => $rhcp->{tanggal},
-                    accountId       => $rhcp->{accountId},
-                    layananId       => $rhcp->{layananId},
-                    referensi       => $rhcp->{referensi} || '',
-                    printer         => $rhcp->{printer} || 102,
-                    adaPacking      => $rhcp->{adaPacking} || 2,
-                    buktiKembali    => $rhcp->{buktiKembali} || 100,
-                    asalId          => $rhcp->{asalId},
-                    tujuanId        => $rhcp->{tujuanId},
-                    kodeOps         => $rhcp->{kodeOps} || '',
-                    namaPenerima    => $rhcp->{namaPenerima},
-                    telepon         => $rhcp->{telepon} || '',
-                    alamat          => $rhcp->{alamat},
-                    grossWeight     => $rhcp->{grossWeight},
-                    chargedWeight   => $rhcp->{chargedWeight} || $rhcp->{grossWeight},
-                    koli            => $rhcp->{koli},
-                    volumetrik      => $rhcp->{volumetrik} || '',
-                    kubikasi        => $rhcp->{kubikasi} || 0,
-                    barang          => $rhcp->{barang} || '',
-                    hargaBarang     => $rhcp->{hargaBarang} || 0,
-                    biayaTambahan   => $rhcp->{biayaTambahan} || 100,
-                    biayaKirimPerKg => $rhcp->{biayaKirimPerKg} || 0,
-                    biayaKirim      => $rhcp->{biayaKirim} || 0,
-                    biayaRealokasi  => $rhcp->{biayaRealokasi} || 0,
-                    biayaPickup     => $rhcp->{biayaPickup} || 0,
-                    biayaAsuransi   => $rhcp->{biayaAsuransi} || 0,
-                    biayaPacking    => $rhcp->{biayaPacking} || 0,
-                    biayaSurcharge  => $rhcp->{biayaSurcharge} || 0,
-                    packingBubble   => $rhcp->{packingBubble} || 0,
-                    biayaDiskon     => $rhcp->{biayaDiskon} || 0,
-                    total           => $rhcp->{total} || 0,
-                    catatan         => $rhcp->{catatan} || '',
-                    maxtm           => $rhcp->{maxtm} || 0,
+                    ATRBAIDO           => $ownerId,
+                    ATRBAIDM           => $userId,
+                    ATRBAIDP           => $rhcp->{accountId},
+                    ATRBTTYID          => 5001,
+                    ATRBIID            => $rhcp->{layananId},
+                    ATRBTNO            => '[AUTO]',
+                    ATRBTNOG           => $rhcp->{referensi} || '',
+                    ATRBTDT            => $rhcp->{tanggal},
+                    ATRBTSS            => 1,
+                    ATRBTBS            => 1,
+                    ATRBTP01           => $rhcp->{asalId},
+                    ATRBTP02           => $rhcp->{tujuanId},
+                    ATRBTP06           => $rhcp->{namaPenerima},
+                    ATRBTP07           => $rhcp->{telepon} || '',
+                    ATRBTP08           => $rhcp->{alamat},
+                    ATRBTP09           => $rhcp->{kodeOps} || '',
+                    ATRBTP11           => $rhcp->{grossWeight},
+                    ATRBTQTY           => $rhcp->{chargedWeight} || $rhcp->{grossWeight},
+                    ATRBTP12           => $rhcp->{volumetrik} || '',
+                    ATRBTP13           => $rhcp->{barang} || '',
+                    ATRBTP14           => $rhcp->{hargaBarang} || 0,
+                    ATRBTP15           => $rhcp->{biayaAsuransi} || 0,
+                    ATRBTP16           => $rhcp->{koli},
+                    ATRBTP17           => $rhcp->{maxtm} || 0,
+                    ATRBTP18           => $rhcp->{printer} || 102,
+                    ATRBTP19           => $rhcp->{biayaTambahan} || 100,
+                    ATRBTP21           => $rhcp->{adaPacking} || 2,
+                    ATRBTP22           => $rhcp->{kubikasi} || 0,
+                    ATRBTP23           => $rhcp->{packingBubble} || 0,
+                    ATRBTP24           => $rhcp->{buktiKembali} || 100,
+                    ATRBTP25           => $rhcp->{biayaDiskon} || 0,
+                    ATRBTP26           => $rhcp->{biayaRealokasi} || 0,
+                    ATRBTP27           => $rhcp->{biayaPickup} || 0,
+                    ATRBTP28           => $rhcp->{biayaPacking} || 0,
+                    ATRBTP29           => $rhcp->{biayaSurcharge} || 0,
+                    ATRBTP30           => $rhcp->{biayaKirimPerKg} || 0,
+                    ATRBTVALU          => $rhcp->{biayaKirim} || 0,
+                    ATRBTVAL           => $rhcp->{total} || 0,
+                    ATRBTP05           => $rhcp->{catatan} || '',
+                    ATRBTDTP           => 'NOW()',
                 }
             );
             $roqHeader->run || die;
 
-            unless ($roqHeader->{result}->{rows}) {
+            my $newBtid = $roqHeader->{result}->{insertId};
+            unless ($newBtid) {
                 $ros->{q}->{e}->{status} = 500;
                 $ros->{q}->{e}->{num}    = "$ros->{className}/createTTKCC/02";
                 $ros->{q}->{e}->{msg}    = 'Gagal menyimpan header TTK ke database';
                 die;
             }
 
-            my $newBtid = $roqHeader->{result}->{insertId};
-
-            # 3. Ambil nomor TTK yang terbentuk
+            # 3. Ambil nomor TTK yang terbentuk via query ttkccGetNomor
             my $rhresNomor = {};
             $ros->q2j('ttkccGetNomor', { btid => $newBtid }, { hashed => 1 }, $rhresNomor);
             my $rhttk = shift @{$rhresNomor->{result}->{body}};
 
-            unless ($rhttk && $rhttk->{nomor}) {
-                $ros->{q}->{e}->{status} = 500;
-                $ros->{q}->{e}->{num}    = "$ros->{className}/createTTKCC/03";
-                $ros->{q}->{e}->{msg}    = 'Header tersimpan tetapi gagal mengambil nomor TTK';
-                die;
-            }
+            my $nomorTTK = ($rhttk && $rhttk->{nomor}) ? $rhttk->{nomor} : $newBtid;
 
-            my $nomorTTK = $rhttk->{nomor};
-
-            # 4. INSERT Child Koli (Loop)
+            # 4. INSERT Child Koli menggunakan Generic Query entbtCreate
             my $listKoli = $rhcp->{listKoli} || [];
             foreach my $rhkoli (@{$listKoli}) {
                 next unless $rhkoli->{koli} && $rhkoli->{grossWeight};
                 my $roqKoli = DCAF::Query->new(
                     q    => $ros->{q},
-                    name => 'ttkccCreateKoli',
+                    name => 'entbtCreate',
                     data => {
-                        parentBtid         => $newBtid,
-                        nomor              => $nomorTTK,
-                        koli               => $rhkoli->{koli} || 1,
-                        grossWeight        => $rhkoli->{grossWeight} || 0,
-                        volumetrik         => $rhkoli->{volumetrik} || '',
-                        kubikasi           => $rhkoli->{kubikasi} || 0,
-                        isBubble           => $rhkoli->{isBubble} ? 1 : 0,
-                        isKayu             => $rhkoli->{isKayu} ? 1 : 0,
-                        jenisBarang        => $rhkoli->{jenisBarang} || '',
-                        catatan            => $rhkoli->{catatan} || '',
-                        beratSurcharge     => $rhkoli->{beratSurcharge} || 0,
-                        biayaSurcharge     => $rhkoli->{biayaSurcharge} || 0,
-                        biayaPacking       => $rhkoli->{biayaPacking} || 0,
-                        biayaPackingBubble => $rhkoli->{biayaPackingBubble} || 0,
+                        ATRBAIDO           => $ownerId,
+                        ATRBAIDM           => $userId,
+                        ATRBAIDP           => $rhcp->{accountId},
+                        ATRBTTYID          => 5001,
+                        ATRBTIDP           => $newBtid,
+                        ATRBTNO            => $nomorTTK,
+                        ATRBTDT            => $rhcp->{tanggal},
+                        ATRBTSS            => 1,
+                        ATRBTBS            => 1,
+                        ATRBTP16           => $rhkoli->{koli} || 1,
+                        ATRBTQTY           => $rhkoli->{grossWeight} || 0,
+                        ATRBTP12           => $rhkoli->{volumetrik} || '',
+                        ATRBTP22           => $rhkoli->{kubikasi} || 0,
+                        ATRBTP04           => $rhkoli->{isBubble} ? 1 : 0,
+                        ATRBTP19           => $rhkoli->{isKayu} ? 1 : 0,
+                        ATRBTP13           => $rhkoli->{jenisBarang} || '',
+                        ATRBTCMT           => $rhkoli->{catatan} || '',
+                        ATRBTP20           => $rhkoli->{beratSurcharge} || 0,
+                        ATRBTP21           => $rhkoli->{biayaSurcharge} || 0,
+                        ATRBTP23           => $rhkoli->{biayaPacking} || 0,
+                        ATRBTP24           => $rhkoli->{biayaPackingBubble} || 0,
+                        ATRBTDTP           => 'NOW()',
                     }
                 );
                 $roqKoli->run;
@@ -986,44 +636,6 @@ sub run {
             last switch;
         };
 
-        # ----------------------------------------------------------------
-        # getTTKCC - GET /a/ttkcc/getTTKCC/{btid}
-        # ----------------------------------------------------------------
-        $ros->{api}->{operation} eq 'getTTKCC' && do {
-            my $btid = $rhpp->{btid};
-            unless ($btid) {
-                $ros->{q}->{e}->{status} = 400;
-                $ros->{q}->{e}->{num}    = "$ros->{className}/getTTKCC/01";
-                $ros->{q}->{e}->{msg}    = 'Parameter btid wajib diisi';
-                die;
-            }
-
-            my $rhresHeader = {};
-            $ros->q2j('ttkccGetHeader', { btid => $btid }, { hashed => 1 }, $rhresHeader);
-            my $rhheader = shift @{$rhresHeader->{result}->{body}};
-
-            unless ($rhheader) {
-                $ros->{q}->{e}->{status} = 404;
-                $ros->{q}->{e}->{num}    = "$ros->{className}/getTTKCC/02";
-                $ros->{q}->{e}->{msg}    = 'Data TTK tidak ditemukan';
-                die;
-            }
-
-            my $rhresKoli = {};
-            $ros->q2j('ttkccGetKoli', { parentBtid => $btid }, { hashed => 1 }, $rhresKoli);
-
-            $ros->{templateData}->{jstext} = $DCAF::ros->{json}->encode({
-                code    => 0,
-                status  => 'success',
-                message => 'Successful',
-                data    => {
-                    header => $rhheader,
-                    koli   => $rhresKoli->{result}->{body} || []
-                }
-            });
-            last switch;
-        };
-
         # Default fallback
         $ros->{templateData}->{jstext} = $DCAF::ros->{json}->encode({
             code    => 1,
@@ -1043,100 +655,48 @@ sub run {
 
 ---
 
-### 5.2 Tambah SQL Queries ke `lib/db/git/dcaf-data.sql`
+### 5.2 Definisi SQL Query EDBQ & EDBQP (Aturan 253)
 
-Tambahkan query ini pada blok tabel `EDBQ`. Pastikan ID EDBQ berurutan setelah record terakhir yang terpasang:
+Hanya 2 query SELECT baru yang perlu didaftarkan ke `lib/db/git/dcaf-data.sql` dan dieksekusi di database dev:
 
 ```sql
 -- ============================================================
--- Modul TTKCC2 Queries (Tabel EDBQ)
+-- Modul TTKCC2 Queries (Tabel EDBQ & EDBQP - Sesuai Range 253)
 -- ============================================================
 
--- Query 1: Create Header TTK Corporate Kubikasi
-INSERT INTO `EDBQ` VALUES (7001,3,'ttkccCreateHeader','TTKCC: Insert Header ENTBT',
-'INSERT INTO ta15_wlogisticsidb_ap.ENTBT
-SET
-  ATRBTTYID = 5001,
-  ATRBTDT   = ?,
-  ATRBAIDP  = ?,
-  ATRBIID   = ?,
-  ATRBTNOG  = ?,
-  ATRBTP18  = ?,
-  ATRBTP21  = ?,
-  ATRBTP24  = ?,
-  ATRBTP01  = ?,
-  ATRBTP02  = ?,
-  ATRBTP09  = ?,
-  ATRBTP06  = ?,
-  ATRBTP07  = ?,
-  ATRBTP08  = ?,
-  ATRBTP11  = ?,
-  ATRBTQTY  = ?,
-  ATRBTP16  = ?,
-  ATRBTP12  = ?,
-  ATRBTP22  = ?,
-  ATRBTP13  = ?,
-  ATRBTP14  = ?,
-  ATRBTP19  = ?,
-  ATRBTP30  = ?,
-  ATRBTVALU = ?,
-  ATRBTP26  = ?,
-  ATRBTP27  = ?,
-  ATRBTP15  = ?,
-  ATRBTP28  = ?,
-  ATRBTP29  = ?,
-  ATRBTP23  = ?,
-  ATRBTP25  = ?,
-  ATRBTVAL  = ?,
-  ATRBTP05  = ?,
-  ATRBTP17  = ?,
-  ATRBTSS   = 1,
-  ATRBTDTP  = NOW()
-',
-'tanggal,accountId,layananId,referensi,printer,adaPacking,buktiKembali,asalId,tujuanId,kodeOps,namaPenerima,telepon,alamat,grossWeight,chargedWeight,koli,volumetrik,kubikasi,barang,hargaBarang,biayaTambahan,biayaKirimPerKg,biayaKirim,biayaRealokasi,biayaPickup,biayaAsuransi,biayaPacking,biayaSurcharge,packingBubble,biayaDiskon,total,catatan,maxtm',
-0,NULL,NULL,NOW());
-
--- Query 2: Get nomor TTK dari ID yang di-generate
-INSERT INTO `EDBQ` VALUES (7002,3,'ttkccGetNomor','TTKCC: Ambil ATRBTNO / ATRBTNOG by ID',
-'SELECT
+-- 1. Query ttkccGetNomor (ID 253006)
+INSERT INTO `EDBQ` (`ADBQID`, `ADBCID`, `ADBQCD`, `ADBQNM`, `ADBQSCR`, `ADBQPAR`, `ADBQCTM`, `ADBQCMT`, `ADBQDTP`)
+VALUES (
+  253006,
+  3,
+  'ttkccGetNomor',
+  'TTKCC: Ambil ATRBTNO / ATRBTNOG by ID',
+  'SELECT
   ATRBTID             btid,
   COALESCE(ATRBTNO, ATRBTNOG, ATRBTID) nomor
 FROM
   ta15_wlogisticsidb_ap.ENTBT
 WHERE
-  ATRBTID = ?
-',
-'btid',
-0,NULL,NULL,NOW());
+  ATRBTID = ?',
+  'btid',
+  0,
+  'Dipakai setelah insert entbtCreate untuk mengambil nomor TTK hasil trigger',
+  NOW()
+);
 
--- Query 3: Create Child Koli Detail
-INSERT INTO `EDBQ` VALUES (7003,3,'ttkccCreateKoli','TTKCC: Insert Child Koli ENTBT',
-'INSERT INTO ta15_wlogisticsidb_ap.ENTBT
-SET
-  ATRBTTYID = 5001,
-  ATRBTIDP  = ?,
-  ATRBTNO   = ?,
-  ATRBTP16  = ?,
-  ATRBTQTY  = ?,
-  ATRBTP12  = ?,
-  ATRBTP22  = ?,
-  ATRBTP04  = ?,
-  ATRBTP19  = ?,
-  ATRBTP13  = ?,
-  ATRBTCMT  = ?,
-  ATRBTP20  = ?,
-  ATRBTP21  = ?,
-  ATRBTP23  = ?,
-  ATRBTP24  = ?,
-  ATRBTSS   = 1,
-  ATRBTDTP  = NOW()
-',
-'parentBtid,nomor,koli,grossWeight,volumetrik,kubikasi,isBubble,isKayu,jenisBarang,catatan,beratSurcharge,biayaSurcharge,biayaPacking,biayaPackingBubble',
-0,NULL,NULL,NOW());
+INSERT INTO `EDBQP` (`ADBQPID`, `ADBQID`, `ADBQPCD`, `ADBQPNM`, `ADBQPDV`)
+VALUES
+  (253006001, 253006, 'btid', 'Business Transaction ID', NULL);
 
--- Query 4: List TTK Header dengan Filter dan Paginasi
-INSERT INTO `EDBQ` VALUES (7004,3,'ttkccListHeader','TTKCC: List Header TTK Corporate Kubikasi',
-'SELECT
+
+-- 2. Query ttkccListHeader (ID 253007)
+INSERT INTO `EDBQ` (`ADBQID`, `ADBCID`, `ADBQCD`, `ADBQNM`, `ADBQSCR`, `ADBQPAR`, `ADBQCTM`, `ADBQCMT`, `ADBQDTP`)
+VALUES (
+  253007,
+  3,
+  'ttkccListHeader',
+  'TTKCC: List Header TTK Corporate Kubikasi',
+  'SELECT
   t.ATRBTID          btid,
   COALESCE(t.ATRBTNO, t.ATRBTNOG, t.ATRBTID) nomor,
   date(t.ATRBTDT)    tanggal,
@@ -1163,11 +723,27 @@ WHERE
   AND (? = 0 OR t.ATRBAIDP = ?)
   AND (? = 0 OR t.ATRBTSS = ?)
 ORDER BY
-  t.ATRBTDT DESC, t.ATRBTID DESC
-',
-'tanggalDari,tanggalDari,tanggalSampai,tanggalSampai,accountId,accountId,status,status',
-0,NULL,NULL,NOW());
+  t.ATRBTDT DESC, t.ATRBTID DESC',
+  'tanggalDari,tanggalDari,tanggalSampai,tanggalSampai,accountId,accountId,status,status',
+  0,
+  'Daftar header transaksi TTK Corporate untuk PVwTTKCCLs.vue',
+  NOW()
+);
+
+INSERT INTO `EDBQP` (`ADBQPID`, `ADBQID`, `ADBQPCD`, `ADBQPNM`, `ADBQPDV`)
+VALUES
+  (253007001, 253007, 'tanggalDari', 'Filter Tanggal Dari', ''),
+  (253007002, 253007, 'tanggalSampai', 'Filter Tanggal Sampai', ''),
+  (253007003, 253007, 'accountId', 'Filter Partner Account ID', '0'),
+  (253007004, 253007, 'status', 'Filter Status Sistem', '0');
 ```
+
+> **Wajib Dilakukan Langsung (Redis Cache Busting):**
+> Jalankan perintah ini di container backend tepat setelah INSERT SQL berhasil:
+> ```bash
+> redis-cli keys "drp.qc*ttkccGetNomor*" | xargs redis-cli del
+> redis-cli keys "drp.qc*ttkccListHeader*" | xargs redis-cli del
+> ```
 
 ---
 
@@ -1243,29 +819,12 @@ paths:
       responses:
         200:
           description: Berhasil memuat daftar TTK
-
-  /getTTKCC/{btid}:
-    get:
-      tags:
-        - TTKCC
-      summary: Ambil detail TTK Corporate Kubikasi
-      operationId: getTTKCC/TTKCC
-      security:
-        - bearer: []
-      parameters:
-        - in: path
-          name: btid
-          required: true
-          schema: { type: integer }
-      responses:
-        200:
-          description: Berhasil memuat detail TTK
 ```
 
 ---
 
 ### 5.4 Registrasi Endpoint di `etc/dcaf.yaml`
-Tambahkan konfigurasi route modul `ttkcc` di bawah section `api:`:
+
 ```yaml
 api:
    dcaf: /etc/api/dcaf.yaml
@@ -1278,7 +837,7 @@ api:
 ## 6. Urutan Eksekusi & Checkpoint
 
 ### Phase 1 — Setup & Review
-- [ ] Review bersama dokumen ini dan sepakati 4 query database baru.
+- [ ] Review bersama dokumen ini dan konfirmasi pemanfaatan query `entbtCreate` (253005).
 - [ ] Buat branch git masing-masing di repositori `swb`:
   - Frontend: `feature/ttkcc2-save-frontend`
   - Backend: `feature/ttkcc2-save-backend`
@@ -1287,12 +846,13 @@ api:
 **Checklist Dev A (Frontend):**
 - [ ] Modifikasi `TTKCC2.vue` (tambah state `isSaving`, computed `isReadyToSave`, tombol Save).
 - [ ] Implementasi fungsi `handleSave` dan `buildPayload` di `TTKCC2.vue`.
-- [ ] Buat halaman baru `TTKCCList.vue`.
+- [ ] Buat halaman baru `PVwTTKCCLs.vue`.
 - [ ] Daftarkan route di `web/dev/dcaf/src/router/routes.js`.
 - [ ] Uji visual form & tombol di browser (Dev Server Quasar).
 
 **Checklist Dev B (Backend):**
-- [ ] Masukkan 4 query SQL ke database dev / migration script `dcaf-data.sql`.
+- [ ] Eksekusi query `253006` dan `253007` (EDBQ & EDBQP) di database dev.
+- [ ] Langsung flush Redis cache untuk kedua query tersebut.
 - [ ] Buat class controller `lib/perl/DCAF/Controller/TTKCC.pm`.
 - [ ] Jalankan uji sintaks: `perl -c -Ilib/perl lib/perl/DCAF/Controller/TTKCC.pm`.
 - [ ] Buat file OpenAPI `etc/api/ttkcc.yaml`.
@@ -1302,31 +862,23 @@ api:
 ### Phase 3 — Integration Testing
 - [ ] Isi form lengkap di `TTKCC2.vue` lalu klik Save.
 - [ ] Verifikasi dialog konfirmasi muncul: "Are you sure to CREATE new record?".
-- [ ] Verifikasi data tersimpan di tabel `ENTBT` (baik header maupun child koli).
+- [ ] Verifikasi data tersimpan di tabel `ENTBT` (header dan child koli).
 - [ ] Verifikasi notifikasi nomor TTK tampil di UI form.
-- [ ] Buka halaman `TTKCCList.vue` dan pastikan record TTK baru muncul pada tabel.
-- [ ] Cek filter tanggal dan filter account pada `TTKCCList.vue`.
-
-### Phase 4 — Merge ke Main
-- [ ] Dev B membuka Pull Request (Backend) terlebih dahulu.
-- [ ] Dev A membuka Pull Request (Frontend).
-- [ ] Cross-review kode antar developer, lakukan merge ke branch utama.
+- [ ] Buka halaman `PVwTTKCCLs.vue` dan pastikan record TTK baru muncul pada tabel.
+- [ ] Cek filter tanggal dan filter account pada `PVwTTKCCLs.vue`.
 
 ---
 
 ## 7. Hal Kritis & Catatan Verifikasi
 
-> [!CAUTION]
-> Perhatikan hal-hal berikut sebelum melakukan deploy ke staging / production:
-
-1. **Pemetaan Kolom Sudah Terkonfirmasi:**
-   Kolom `ENTBT` baik untuk Header (`f5018005322`) maupun Child Koli (`5018135703`) telah diverifikasi langsung dari struktur form HTML sandbox DW lama. Tidak lagi menggunakan asumsi sementara.
-2. **Nomor TTK Generator:**
-   Query `ttkccGetNomor` menggunakan fallback `COALESCE(ATRBTNO, ATRBTNOG, ATRBTID)`. Jika tabel `ENTBT` di server database telah dipasangi trigger database auto-numbering, `ATRBTNO` otomatis terisi. Jika belum, nomor sementara menggunakan fallback ID atau nomor referensi.
-3. **Privilege Database User `dwtb`:**
-   Query `ttkccListHeader` melakukan join antara database `ta15_wlogisticsidb_ap` dan tabel referensi `swb` (`ENTBA`, `ENTBE`, `ENTCAREA`, `ENTLV`). Pastikan user database yang tertera di `etc/dcaf.yaml` memiliki hak akses `SELECT` dan `INSERT` ke database `ta15_wlogisticsidb_ap`.
+1. **Penggunaan Generic Query `entbtCreate` (ID `253005`):**
+   Tidak perlu membuat query INSERT custom baru. `entbtCreate` sudah dirancang khusus untuk menangani tabel `ENTBT` pada koneksi 3 (`ta15_wlogisticsidb_ap`).
+2. **Kepatuhan Aturan 253 & EDBQP:**
+   Semua query baru menggunakan prefix ID `253`, dan seluruh parameternya wajib terdaftar di tabel `EDBQP`.
+3. **Disiplin Redis Cache:**
+   Setiap ada penambahan atau pengubahan query di `EDBQ`/`EDBQP`, cache Redis **wajib langsung di-flush sendiri** oleh developer/agent.
 4. **Disiplin Gaya Kode:**
-   Sesuai aturan arsitektur SWB, tidak boleh ada penulisan string SQL di dalam controller Perl. Gunakan selalu `DCAF::Query` atau `$ros->q2j()`.
+   Tidak ada inline SQL di Perl, dan tidak ada emoticon / emoji di semua baris file maupun komentar.
 
 ---
-*Dokumen ini diperbarui: 2026-11-06 — Status query terverifikasi dan siap dieksekusi.*
+*Dokumen diperbarui: 2026-11-07 — Telah diselaraskan dengan aturan terbaru .agents/rules dan .ai.*
