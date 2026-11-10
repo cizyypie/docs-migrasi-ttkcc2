@@ -306,6 +306,29 @@ Halaman `TTKCCList.vue` hanya menyediakan filter sederhana (rentang tanggal, aku
 
 ---
 
+## 13. Sinkronisasi Opsi Status Filter dengan Master Data ENTLV — 2026-11-10
+
+**Commit:** `0442593f` (`feat(ttkcc): perbarui opsi status filter sesuai master ENTLV legacy whnTTKList`)
+
+**Kondisi awal:**
+Pilihan status pada dialog filter di `TTKCCList.vue` sebelumnya menggunakan opsi hardcode sederhana (*Semua Status, 1: Baru, 2: Proses, 9: Batal*). Hal ini belum selaras dengan master data status TTK legasi di sandbox Dev Wahana (`whnTTKList`).
+
+**Perubahan & Implementasi:**
+- Menyelaraskan daftar status pada dropdown select (`optionsStatus`) dengan master tabel `ta15_wlogisticsidb_ap.ENTLV` untuk `ATRLVTYID = 9`:
+  - `[?]` (value: `null` / Semua Status)
+  - `Aktif` (value: `3`)
+  - `Baru` (value: `1`)
+  - `Batal` (value: `5`)
+  - `Dalam Verifikasi` (value: `2`)
+  - `Selesai` (value: `4`)
+  - `Tidak Ditemukan` (value: `6`)
+- Lulus verifikasi ESLint (0 errors, 0 warnings).
+
+**Dampak bisnis:**
+Filter status pada pencarian TTK kini 100% konsisten dengan data operasional logistik di sistem produksi.
+
+---
+
 ## Catatan & Risiko (Status Terkini)
 
 1. **Mapping akun**: Masih terdapat mapping kode akun ke ID di `knownAccounts`. Ke depan dapat diperluas via query dinamis jika ada penambahan akun korporat baru.

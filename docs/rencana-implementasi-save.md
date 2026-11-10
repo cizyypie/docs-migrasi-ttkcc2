@@ -872,6 +872,15 @@ api:
 - [x] Commit frontend: `b333c0dd` (tombol save) dan `803a18d8` (halaman list ttk & capacitor core).
 - [x] Verifikasi runtime end-to-end pada server dev / container (uWSGI + Nginx + Galera DB + Redis).
 
+### Phase 5 — Pencarian Cepat, Parameter Filter Lengkap, dan Sinkronisasi Status (2026-11-10)
+- [x] Query lookup cepat by nomor TTK `ttkccFindByNomor` (`EDBQ` ID `253103`) via unique index `ENTBT_AK` (< 10 ms).
+- [x] Dual-path routing di backend controller `lib/perl/DCAF/Controller/TTKCC.pm` (`listTTKCC`) dan OpenAPI `etc/api/ttkcc.yaml`.
+- [x] Dialog pencarian 11 parameter di `TTKCCList.vue` (Sejak, Sampai, Agen/Account, Nomor, Kode Ops, Status, Asal, Tujuan, Info, Jenis, NIK Pembuat).
+- [x] Tombol split dropdown Filter dengan fitur Print (Portrait/Landscape) dan Save Tab Delimited Text File (`.tsv`).
+- [x] Penanganan parameter SQL NULL pada query catalog `ttkccListHeader` (`253102`) menggunakan `COALESCE(?, "") = ""` dan default value `EDBQP` (`ADBQPDV`).
+- [x] Sinkronisasi opsi status filter dropdown (`optionsStatus`) dengan master tabel `ta15_wlogisticsidb_ap.ENTLV` (`ATRLVTYID = 9`).
+- [x] Commit `14405297` dan `0442593f` pada repository `swb`.
+
 ---
 
 ## 7. Hal Kritis & Catatan Verifikasi
@@ -891,4 +900,4 @@ api:
    Pastikan target symlink request log `/hdd/logs/nginx/swb/requests/api` memiliki permission writeable pada lingkungan kontainer/server uWSGI agar `DCAF/Web.pm` dapat menulis log request tanpa error 500.
 
 ---
-*Dokumen ini diperbarui: 2026-11-09 — Implementasi Save & List TTKCC2 selesai dan terverifikasi 100% fungsional.*
+*Dokumen ini diperbarui: 2026-11-10 — Implementasi Save & List TTKCC2 selesai dan terverifikasi 100% fungsional.*
