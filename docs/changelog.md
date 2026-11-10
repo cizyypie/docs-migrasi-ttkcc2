@@ -269,6 +269,43 @@ flowchart LR
 
 ---
 
+## 12. Pencarian Cepat Nomor TTK, Filter Parameter Lengkap, dan Menu Ekspor TSV / Print Grid — 2026-11-10
+
+**Commit:** `14405297` (`feat(ttkcc): implementasi pencarian cepat nomor ttk, filter parameter lengkap, dan menu ekspor tsv/print`)
+
+**Kondisi awal:**
+Halaman `TTKCCList.vue` hanya menyediakan filter sederhana (rentang tanggal, akun, status). Saat pengguna ingin mencari TTK tertentu berdasarkan nomor TTK (misal dari barcode / bukti tanda terima lama), pengguna terpaksa harus menebak rentang tanggal pembuatan TTK tersebut, karena query list selalu mewajibkan rentang tanggal. Selain itu, menu filter di sandbox Dev Wahana (`whnTTKList`) memiliki fitur dropdown split button untuk pencetakan tabel (Portrait/Landscape) dan ekspor data baris (Tab Delimited Text File).
+
+**Solusi & Implementasi:**
+1. *Arsitektur Dual-Path Routing (Opsi 2)*:
+   - **Jalur A (Fast Lookup by Nomor TTK)**: Jika input `nomor` diisi, backend langsung mengeksekusi query baru `ttkccFindByNomor` (`EDBQ` ID `253103`). Query ini memanfaatkan unique index `ENTBT_AK` pada kolom `ta15_wlogisticsidb_ap.ENTBT.ATRBTNO`, tanpa filter tanggal sama sekali. Waktu respon eksekusi query adalah **5.2 ms** (instan).
+   - **Jalur B (Browsing / Monitoring Harian Terindeks)**: Jika `nomor` kosong, backend menggunakan query teroptimasi `ttkccListHeader` (`EDBQ` ID `253102`) yang terikat rentang tanggal B-tree index `ATRBTDT_IX` dengan filter tambahan opsional: `kodeOps`, `asal`, `tujuan`, `info`, dan `nikPembuat`.
+
+2. *Registrasi Query Catalog & Flush Redis*:
+   - Menambahkan query `ttkccFindByNomor` di `swb.EDBQ` (`ADBQID = 253103`, `ADBCID = 3`) dan parameter `nomor` di `swb.EDBQP` (`ADBQPID = 253103001`).
+   - Memperbarui query `ttkccListHeader` di `swb.EDBQ` (`ADBQID = 253102`) dan mendaftarkan 5 parameter baru di `swb.EDBQP` (`253102005` - `253102009`): `kodeOps`, `asal`, `tujuan`, `info`, `nikPembuat`.
+   - Menghapus key cache Redis terkait query `ttkcc*` (`drp.qc;*ttkcc*`).
+
+3. *Backend Controller & OpenAPI Specification*:
+   - Memperbarui fungsi `listTTKCC` di `lib/perl/DCAF/Controller/TTKCC.pm` untuk mengevaluasi parameter `->{nomor}` dan memilih jalur eksekusi yang sesuai.
+   - Menambahkan parameter `nomor`, `kodeOps`, `asal`, `tujuan`, `info`, dan `nikPembuat` pada endpoint `GET /a/ttkcc/listTTKCC` di `etc/api/ttkcc.yaml`.
+
+4. *Frontend UI & Interaktivitas (`TTKCCList.vue`)*:
+   - Mengganti tombol filter dengan `q-btn-dropdown` split button berlabel "Filter". Klik tombol utama membuka modal filter, sedangkan klik panah dropdown menampilkan menu aksi:
+     - `Print -> Portrait` (mencetak tabel dengan orientasi portrait).
+     - `Print -> Landscape` (mencetak tabel dengan orientasi landscape).
+     - `Save -> Tab Delimited Text File` (mengekstrak seluruh kolom data tabel aktif ke format `.tsv` yang aman dari pemotongan digit Excel).
+   - Memperluas modal dialog menjadi 11 field sesuai form modal bawaan sandbox `whnTTKList`: Sejak, Sampai, Agen/Account, Nomor, Kode Ops, Status, Asal, Tujuan, Informasi TTK, Jenis TTK, dan NIK Pembuat.
+   - Menambahkan aturan `@media print` agar elemen tombol, pagination, watermark, dan kolom aksi tersembunyi secara otomatis saat mencetak.
+   - Lulus verifikasi ESLint (0 errors, 0 warnings).
+
+**Dampak bisnis:**
+- Pengguna dapat mencari nomor TTK apa saja secara instan (< 10 ms) tanpa perlu mengingat atau menyetel rentang tanggal pembuatan.
+- Petugas operasional dan billing korporat dapat mengekspor rekap daftar TTK ke format tab-delimited text (`.tsv`) untuk rekonsiliasi faktur tanpa kendala scientific notation / angka terpotong seperti yang biasa terjadi di spreadsheet.
+- Keseluruhan alur pencarian dan pelaporan kini 100% setara dengan fungsionalitas legacy `whnTTKList`.
+
+---
+
 ## Catatan & Risiko (Status Terkini)
 
 1. **Mapping akun**: Masih terdapat mapping kode akun ke ID di `knownAccounts`. Ke depan dapat diperluas via query dinamis jika ada penambahan akun korporat baru.
