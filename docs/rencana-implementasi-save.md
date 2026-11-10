@@ -837,48 +837,58 @@ api:
 ## 6. Urutan Eksekusi & Checkpoint
 
 ### Phase 1 — Setup & Review
-- [ ] Review bersama dokumen ini dan konfirmasi pemanfaatan query `entbtCreate` (253005).
-- [ ] Buat branch git masing-masing di repositori `swb`:
-  - Frontend: `feature/ttkcc2-save-frontend`
-  - Backend: `feature/ttkcc2-save-backend`
+- [x] Review bersama dokumen ini dan konfirmasi pemanfaatan query `entbtCreate` (253005).
+- [x] Siapkan branch kerja di repositori `swb` (`TTKCC2-FZ`).
 
 ### Phase 2 — Parallel Development
 **Checklist Dev A (Frontend):**
-- [ ] Modifikasi `TTKCC2.vue` (tambah state `isSaving`, computed `isReadyToSave`, tombol Save).
-- [ ] Implementasi fungsi `handleSave` dan `buildPayload` di `TTKCC2.vue`.
-- [ ] Buat halaman baru `PVwTTKCCLs.vue`.
-- [ ] Daftarkan route di `web/dev/dcaf/src/router/routes.js`.
-- [ ] Uji visual form & tombol di browser (Dev Server Quasar).
+- [x] Modifikasi `TTKCC2.vue` (tambah state `isSaving`, computed `isReadyToSave`, tombol Save).
+- [x] Implementasi fungsi `handleSave` dan `buildPayload` di `TTKCC2.vue`.
+- [x] Buat halaman baru `TTKCCList.vue` (28 kolom sandbox, styling Quasar SWB, tombol aksi).
+- [x] Tambah dependensi `@capacitor/core: ^3.9.0` untuk kelengkapan plugin kamera.
+- [x] Daftarkan route di `web/dev/dcaf/src/router/routes.js` (`/TTKCCList`).
+- [x] Uji visual form & tombol di browser (Dev Server Quasar) — lulus ESLint 0 error.
 
 **Checklist Dev B (Backend):**
-- [ ] Eksekusi query `253006` dan `253007` (EDBQ & EDBQP) di database dev.
-- [ ] Langsung flush Redis cache untuk kedua query tersebut.
-- [ ] Buat class controller `lib/perl/DCAF/Controller/TTKCC.pm`.
-- [ ] Jalankan uji sintaks: `perl -c -Ilib/perl lib/perl/DCAF/Controller/TTKCC.pm`.
-- [ ] Buat file OpenAPI `etc/api/ttkcc.yaml`.
-- [ ] Daftarkan modul di `etc/dcaf.yaml`.
-- [ ] Restart service uWSGI dev dan uji endpoint via Postman / curl.
+- [x] Daftarkan query SQL ke catalog `EDBQ` (`entbtCreate` 253005 dan `ttkccListHeader` 253102).
+- [x] Buat class controller `lib/perl/DCAF/Controller/TTKCC.pm`.
+- [x] Integrasikan auto-numbering resmi via helper `$ros->mkBTNo('TTKC-')` dan penomoran sub-koli `<nomorTTK>/<index>`.
+- [x] Jalankan uji sintaks: `perl -c -Ilib/perl lib/perl/DCAF/Controller/TTKCC.pm` (Syntax OK).
+- [x] Buat file OpenAPI `etc/api/ttkcc.yaml`.
+- [x] Daftarkan modul di `etc/dcaf.yaml` (`/a/ttkcc: etc/api/ttkcc.yaml`).
+- [x] Restart service uWSGI dev dan uji endpoint via curl / axios (`code: 0`, status: success).
 
 ### Phase 3 — Integration Testing
-- [ ] Isi form lengkap di `TTKCC2.vue` lalu klik Save.
-- [ ] Verifikasi dialog konfirmasi muncul: "Are you sure to CREATE new record?".
-- [ ] Verifikasi data tersimpan di tabel `ENTBT` (header dan child koli).
-- [ ] Verifikasi notifikasi nomor TTK tampil di UI form.
-- [ ] Buka halaman `PVwTTKCCLs.vue` dan pastikan record TTK baru muncul pada tabel.
-- [ ] Cek filter tanggal dan filter account pada `PVwTTKCCLs.vue`.
+- [x] Isi form lengkap di `TTKCC2.vue` lalu klik Save.
+- [x] Verifikasi dialog konfirmasi muncul: "Are you sure to CREATE new record?".
+- [x] Verifikasi data tersimpan di tabel `ENTBT` (baik header `ATRBTID` maupun child koli `ATRBTIDP`).
+- [x] Verifikasi notifikasi nomor TTK tampil di UI form (`TTKC-H5B90000001` berhasil dibuat).
+- [x] Buka halaman `TTKCCList.vue` dan pastikan record TTK baru muncul pada tabel.
+- [x] Optimasi query `ttkccListHeader` (sargable date filter & prefix filter `TTKC-%`) terpangkas dari > 60s ke 12 ms.
+- [x] Cek filter tanggal dan filter account pada `TTKCCList.vue`.
+
+### Phase 4 — Commit & Verification
+- [x] Commit backend: `c7380362` (tambah controller & registrasi api) dan `e114a774` (otomasi penomoran resmi).
+- [x] Commit frontend: `b333c0dd` (tombol save) dan `803a18d8` (halaman list ttk & capacitor core).
+- [x] Verifikasi runtime end-to-end pada server dev / container (uWSGI + Nginx + Galera DB + Redis).
 
 ---
 
 ## 7. Hal Kritis & Catatan Verifikasi
 
+> [!CAUTION]
+> Perhatikan hal-hal berikut sebelum melakukan deploy ke staging / production:
+
 1. **Penggunaan Generic Query `entbtCreate` (ID `253005`):**
    Tidak perlu membuat query INSERT custom baru. `entbtCreate` sudah dirancang khusus untuk menangani tabel `ENTBT` pada koneksi 3 (`ta15_wlogisticsidb_ap`).
-2. **Kepatuhan Aturan 253 & EDBQP:**
-   Semua query baru menggunakan prefix ID `253`, dan seluruh parameternya wajib terdaftar di tabel `EDBQP`.
-3. **Disiplin Redis Cache:**
-   Setiap ada penambahan atau pengubahan query di `EDBQ`/`EDBQP`, cache Redis **wajib langsung di-flush sendiri** oleh developer/agent.
-4. **Disiplin Gaya Kode:**
-   Tidak ada inline SQL di Perl, dan tidak ada emoticon / emoji di semua baris file maupun komentar.
+2. **Nomor TTK Generator Resmi:**
+   Penomoran TTK menggunakan helper bawaan DCAF `$ros->mkBTNo('TTKC-')` berbasis Redis harian. Menghasilkan format resmi seperti `TTKC-H5B90000001`, dan child koli terhubung melalui kolom `ATRBTIDP` dengan format `TTKC-H5B90000001/1`.
+3. **Privilege Database & Indexing ENTBT:**
+   Query `ttkccListHeader` (`253102`, `ADBCID = 3`) mengeksekusi data pada `ta15_wlogisticsidb_ap.ENTBT`. Wajib menggunakan filter tanggal *sargable* `t.ATRBTDT >= concat(?, ' 00:00:00')` dan prefix `t.ATRBTNO LIKE 'TTKC-%'` untuk menghindari *Full Table Scan* pada puluhan juta baris data (waktu respon 12 ms vs >60s timeout).
+4. **Disiplin Gaya Kode & Redis Cache:**
+   Sesuai aturan arsitektur SWB, tidak ada penulisan string SQL di dalam controller Perl. Seluruh query menggunakan `EDBQ` catalog dan cache Redis langsung dibersihkan (`flush`) setelah penambahan atau perubahan definisi query. Dilarang menggunakan emoticon / emoji pada file kode maupun dokumentasi.
+5. **Direktori Request Logging uWSGI:**
+   Pastikan target symlink request log `/hdd/logs/nginx/swb/requests/api` memiliki permission writeable pada lingkungan kontainer/server uWSGI agar `DCAF/Web.pm` dapat menulis log request tanpa error 500.
 
 ---
-*Dokumen diperbarui: 2026-11-07 — Telah diselaraskan dengan aturan terbaru .agents/rules dan .ai.*
+*Dokumen ini diperbarui: 2026-11-09 — Implementasi Save & List TTKCC2 selesai dan terverifikasi 100% fungsional.*

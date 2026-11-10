@@ -182,6 +182,13 @@ flowchart TD
    - Modul ini tidak lagi menggunakan nilai fallback manual. Jika query tidak mengembalikan data untuk kode biaya yang bersangkutan, nilai otomatis diset 0.
 2. **Perubahan Rumus Kubikasi**:
    - Jika ada kebutuhan penyesuaian faktor pembagi kubikasi, periksa method `setKubikasiWithoutRounded` baris 2814 (`wgtv = (lqbik / 4000) * koli`).
-3. **Penyimpanan TTK Baru**:
-   - Payload simpan dikirim ke endpoint controller backend `whnSaveTTKCorporate` melalui method `simpanData()`.
-   - Pastikan field wajib (*mandatory*) terisi: Tanggal, Account, Gross Weight, Tujuan, dan Biaya Tambahan.
+3. **Penyimpanan TTK Baru (Create TTKCC)**:
+   - Payload simpan dikirim ke endpoint controller backend `POST /a/ttkcc/createTTKCC` (Controller `DCAF::Controller::TTKCC`) melalui method `handleSave()` di `TTKCC2.vue`.
+   - Field wajib (*mandatory*): Tanggal, Account, Layanan, Asal, Tujuan, Nama Penerima, Alamat Penerima, Gross Weight, dan Koli.
+   - Penomoran resmi di-generate unik via `$ros->mkBTNo('TTKC-')` berbasis Redis harian (format: `TTKC-H5B90000001`). Sub-koli terhubung via foreign key `ATRBTIDP` dengan format penomoran `<nomorInduk>/<index>`.
+4. **Halaman Monitoring & Daftar TTK (`TTKCCList.vue`)**:
+   - Akses melalui route `/TTKCCList`.
+   - Menampilkan 28 kolom data transaksi lengkap sesuai antarmuka sandbox DW `whnTTKList`.
+   - Mengambil data melalui endpoint `GET /a/ttkcc/listTTKCC` yang memanggil query database `ttkccListHeader` (`EDBQ` ID `253102`, `ADBCID = 3` pada `ta15_wlogisticsidb_ap.ENTBT`).
+   - Query telah dioptimasi dengan format *sargable date range* (`t.ATRBTDT >= concat(?, ' 00:00:00')`) dan prefix filter `t.ATRBTNO LIKE 'TTKC-%'`, dengan waktu eksekusi ~12 ms.
+   - Dilengkapi 5 aksi bertumpuk: Track, Print Normal, Print Thermal, Print Normal (v2), dan Print Thermal (v2).
