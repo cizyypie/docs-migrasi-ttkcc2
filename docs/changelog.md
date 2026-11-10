@@ -20,6 +20,8 @@
 | 9 | 2026-11-09 | `c7380362` | Penambahan controller backend TTKCC.pm & registrasi API | Backend DCAF resmi melayani createTTKCC, listTTKCC, getTTKCC dengan validasi trust boundary |
 | 10 | 2026-11-09 | `e114a774` | Otomasi penomoran TTK resmi (mkBTNo) & sinkronisasi axios | Penomoran TTKC unik harian, relasi multi-koli terstruktur, routing axios /a konsisten |
 | 11 | 2026-11-09 | Tuning SQL | Optimasi query ttkccListHeader & fix logging uWSGI | Query turun dari >60s (timeout 504) ke 12 ms via index range, transaksi langsung tampil instan |
+| 12 | 2026-11-10 | `14405297` | Pencarian cepat nomor TTK, filter modal lengkap, menu ekspor TSV & print | Pengguna dapat mencari TTK instan (<10ms) tanpa tanggal, ekspor tabel aman tanpa truncating |
+| 13 | 2026-11-10 | `53cafe92` | Sinkronisasi opsi status filter dengan master data ENTLV (`ATRLVTYID=9`) | Pilihan status filter pada dialog pencarian 100% konsisten dengan data operasional produksi |
 
 ### Alur kalkulasi setelah semua perubahan
 
@@ -269,7 +271,7 @@ flowchart LR
 
 ---
 
-## 12. Pencarian Cepat Nomor TTK, Filter Parameter Lengkap, dan Menu Ekspor TSV / Print Grid — 2026-11-10
+## 12. Pencarian Cepat Nomor TTK, Filter Parameter Lengkap, dan Menu Ekspor TSV / Print Grid — `14405297` · 2026-11-10
 
 **Commit:** `14405297` (`feat(ttkcc): implementasi pencarian cepat nomor ttk, filter parameter lengkap, dan menu ekspor tsv/print`)
 
@@ -306,9 +308,9 @@ Halaman `TTKCCList.vue` hanya menyediakan filter sederhana (rentang tanggal, aku
 
 ---
 
-## 13. Sinkronisasi Opsi Status Filter dengan Master Data ENTLV — 2026-11-10
+## 13. Sinkronisasi Opsi Status Filter dengan Master Data ENTLV — `53cafe92` · 2026-11-10
 
-**Commit:** `0442593f` (`feat(ttkcc): perbarui opsi status filter sesuai master ENTLV legacy whnTTKList`)
+**Commit:** `53cafe928e8c57379d6acbb7660f5b8a47a2648a` (`feat(ttkcc): perbarui opsi status filter`)
 
 **Kondisi awal:**
 Pilihan status pada dialog filter di `TTKCCList.vue` sebelumnya menggunakan opsi hardcode sederhana (*Semua Status, 1: Baru, 2: Proses, 9: Batal*). Hal ini belum selaras dengan master data status TTK legasi di sandbox Dev Wahana (`whnTTKList`).

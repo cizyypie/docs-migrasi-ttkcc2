@@ -879,7 +879,7 @@ api:
 - [x] Tombol split dropdown Filter dengan fitur Print (Portrait/Landscape) dan Save Tab Delimited Text File (`.tsv`).
 - [x] Penanganan parameter SQL NULL pada query catalog `ttkccListHeader` (`253102`) menggunakan `COALESCE(?, "") = ""` dan default value `EDBQP` (`ADBQPDV`).
 - [x] Sinkronisasi opsi status filter dropdown (`optionsStatus`) dengan master tabel `ta15_wlogisticsidb_ap.ENTLV` (`ATRLVTYID = 9`).
-- [x] Commit `14405297` dan `0442593f` pada repository `swb`.
+- [x] Commit `14405297` dan `53cafe92` pada repository `swb`.
 
 ---
 
