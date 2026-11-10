@@ -283,7 +283,7 @@ Halaman `TTKCCList.vue` hanya menyediakan filter sederhana (rentang tanggal, aku
 
 2. *Registrasi Query Catalog & Flush Redis*:
    - Menambahkan query `ttkccFindByNomor` di `swb.EDBQ` (`ADBQID = 253103`, `ADBCID = 3`) dan parameter `nomor` di `swb.EDBQP` (`ADBQPID = 253103001`).
-   - Memperbarui query `ttkccListHeader` di `swb.EDBQ` (`ADBQID = 253102`) dan mendaftarkan 5 parameter baru di `swb.EDBQP` (`253102005` - `253102009`): `kodeOps`, `asal`, `tujuan`, `info`, `nikPembuat`.
+   - Memperbarui query `ttkccListHeader` di `swb.EDBQ` (`ADBQID = 253102`) menggunakan pembungkus aman `COALESCE(?, "") = ""` untuk filter opsional, serta mendaftarkan dan menyetel nilai default string kosong pada parameter baru di `swb.EDBQP` (`253102005` - `253102009`: `kodeOps`, `asal`, `tujuan`, `info`, `nikPembuat`). Ini mencegah kegagalan evaluasi tri-state logic SQL saat parameter bernilai NULL.
    - Menghapus key cache Redis terkait query `ttkcc*` (`drp.qc;*ttkcc*`).
 
 3. *Backend Controller & OpenAPI Specification*:
