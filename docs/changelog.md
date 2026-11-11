@@ -334,7 +334,7 @@ Filter status pada pencarian TTK kini 100% konsisten dengan data operasional log
 
 ## 14. Styling Tombol Filter Full Blue & Optimasi Layout Tabel Kompak — `618f1374` · 2026-11-11
 
-**Commit:** `618f1374` (`style(ttkcc): perbaiki tombol filter full blue dan optimasi layout tabel super kompak`)
+**Commit:** `618f1374` (`style(ttkcc): perbaiki tombol filter full blue dan optimasi layout tabel super kompak`) & `9101d4f8` (`style(ttkcc): kembalikan header tabel ke warna standar tanpa highlight biru`)
 
 **Kondisi awal:**
 1. Tombol split-dropdown "Filter" memiliki bingkai/padding putih di sekelilingnya akibat kelas padding kontainer Quasar yang transparan terhadap latar belakang card putih.
@@ -345,7 +345,7 @@ Filter status pada pencarian TTK kini 100% konsisten dengan data operasional log
 - **Layout Tabel Super Kompak**:
   - Mengatur ukuran font kompak (9.5px) dan padding sel minimal (2px 3px) pada seluruh header dan data row.
   - Mengizinkan wrapping teks multiline pada header (`white-space: pre-line`) sehingga kolom teks panjang (seperti *Update Terakhir Oleh*, *Kode Operasional*, *Kode Sortir Pickup*) memadat menjadi 40-70px.
-  - Menerapkan pewarnaan header selaras sandbox legasi: header kuning lembut (`#fefde8`) pada kolom 1-3 (*Tanggal*, *Nik Pembuat*, *TTK Baru*), dan header biru pekat (`#2b579a`) dengan teks putih pada kolom 18-30 (*Penerima*, *DN*, *Koli*, *Berat*, *Lead Time*, *Akun*, *Manifest*).
+  - Menerapkan pewarnaan header bersih: header kuning lembut (`#fefde8`) pada kolom 1-3 (*Tanggal*, *Nik Pembuat*, *TTK Baru*) dan header abu-abu standar bersih (`#fafafa` teks gelap) pada kolom lainnya tanpa highlight biru, menjaga keterbacaan teks dan konsistensi UI.
   - Melengkapi kolom *Manifest Agen* dan *Manifest Sortir* sebelum kolom aksi.
   - Memadatkan tombol aksi bertumpuk (Track, Print Normal, Print Thermal, Normal v2, Thermal v2) menjadi tinggi 15px dengan lebar kolom tetap ~78px.
 - Lulus verifikasi ESLint (0 errors, 0 warnings).
