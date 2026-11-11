@@ -22,6 +22,7 @@
 | 11 | 2026-11-09 | Tuning SQL | Optimasi query ttkccListHeader & fix logging uWSGI | Query turun dari >60s (timeout 504) ke 12 ms via index range, transaksi langsung tampil instan |
 | 12 | 2026-11-10 | `14405297` | Pencarian cepat nomor TTK, filter modal lengkap, menu ekspor TSV & print | Pengguna dapat mencari TTK instan (<10ms) tanpa tanggal, ekspor tabel aman tanpa truncating |
 | 13 | 2026-11-10 | `53cafe92` | Sinkronisasi opsi status filter dengan master data ENTLV (`ATRLVTYID=9`) | Pilihan status filter pada dialog pencarian 100% konsisten dengan data operasional produksi |
+| 14 | 2026-11-11 | `618f1374` | Tombol Filter full blue & optimasi tabel super kompak 31 kolom | Tombol filter solid tanpa border putih, seluruh kolom tabel tampil rapi dalam 1 layar horizontal |
 
 ### Alur kalkulasi setelah semua perubahan
 
@@ -328,6 +329,29 @@ Pilihan status pada dialog filter di `TTKCCList.vue` sebelumnya menggunakan opsi
 
 **Dampak bisnis:**
 Filter status pada pencarian TTK kini 100% konsisten dengan data operasional logistik di sistem produksi.
+
+---
+
+## 14. Styling Tombol Filter Full Blue & Optimasi Layout Tabel Kompak — `618f1374` · 2026-11-11
+
+**Commit:** `618f1374` (`style(ttkcc): perbaiki tombol filter full blue dan optimasi layout tabel super kompak`)
+
+**Kondisi awal:**
+1. Tombol split-dropdown "Filter" memiliki bingkai/padding putih di sekelilingnya akibat kelas padding kontainer Quasar yang transparan terhadap latar belakang card putih.
+2. Tampilan tabel daftar TTK memiliki teks header non-wrapping (`white-space: nowrap`) dan padding besar, sehingga kolom menjadi sangat lebar dan memerlukan scroll horizontal panjang untuk melihat informasi penerima, koli, berat, maupun tombol aksi.
+
+**Perubahan & Implementasi:**
+- **Tombol Filter Full Blue**: Menghapus padding luar, menambahkan properti `unelevated`, dan menyetel styling `.btn-filter-full-blue` dengan latar belakang solid `#1976d2` secara menyeluruh dari tepi luar hingga pemisah panah dropdown.
+- **Layout Tabel Super Kompak**:
+  - Mengatur ukuran font kompak (9.5px) dan padding sel minimal (2px 3px) pada seluruh header dan data row.
+  - Mengizinkan wrapping teks multiline pada header (`white-space: pre-line`) sehingga kolom teks panjang (seperti *Update Terakhir Oleh*, *Kode Operasional*, *Kode Sortir Pickup*) memadat menjadi 40-70px.
+  - Menerapkan pewarnaan header selaras sandbox legasi: header kuning lembut (`#fefde8`) pada kolom 1-3 (*Tanggal*, *Nik Pembuat*, *TTK Baru*), dan header biru pekat (`#2b579a`) dengan teks putih pada kolom 18-30 (*Penerima*, *DN*, *Koli*, *Berat*, *Lead Time*, *Akun*, *Manifest*).
+  - Melengkapi kolom *Manifest Agen* dan *Manifest Sortir* sebelum kolom aksi.
+  - Memadatkan tombol aksi bertumpuk (Track, Print Normal, Print Thermal, Normal v2, Thermal v2) menjadi tinggi 15px dengan lebar kolom tetap ~78px.
+- Lulus verifikasi ESLint (0 errors, 0 warnings).
+
+**Dampak bisnis:**
+Tampilan pemantauan daftar TTK kini 100% identik dengan sandbox Dev Wahana (`whnTTKList`), memungkinkan petugas operasional memantau keseluruhan 31 kolom data secara instan dalam satu bentangan layar tanpa terpotong.
 
 ---
 
