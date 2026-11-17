@@ -23,6 +23,8 @@
 | 12 | 2026-11-10 | `14405297` | Pencarian cepat nomor TTK, filter modal lengkap, menu ekspor TSV & print | Pengguna dapat mencari TTK instan (<10ms) tanpa tanggal, ekspor tabel aman tanpa truncating |
 | 13 | 2026-11-10 | `53cafe92` | Sinkronisasi opsi status filter dengan master data ENTLV (`ATRLVTYID=9`) | Pilihan status filter pada dialog pencarian 100% konsisten dengan data operasional produksi |
 | 14 | 2026-11-11 | `618f1374` | Tombol Filter full blue & optimasi tabel super kompak 31 kolom | Tombol filter solid tanpa border putih, seluruh kolom tabel tampil rapi dalam 1 layar horizontal |
+| 15 | 2026-11-13 | `10602048` | Input nama penerima manual & penambahan field `jenis` dan `flag` saat save | Input nama bebas tanpa dropdown, header & koli menyimpan `ATRBTP10=102` dan `ATRBTFLAG=1` sesuai sandbox DW |
+| 16 | 2026-11-13 | Update | Migrasi penomoran resmi TTK menggunakan strict `mkCSNNo()` | Nomor TTK diterbitkan langsung dari antrean nomor resi fisik Wahana di Redis (`wax/ttknoq`) |
 
 ### Alur kalkulasi setelah semua perubahan
 
@@ -354,6 +356,32 @@ Filter status pada pencarian TTK kini 100% konsisten dengan data operasional log
 Tampilan pemantauan daftar TTK kini 100% identik dengan sandbox Dev Wahana (`whnTTKList`), memungkinkan petugas operasional memantau keseluruhan 31 kolom data secara instan dalam satu bentangan layar tanpa terpotong.
 
 ---
+
+---
+
+## 15. Input Nama Manual & Penambahan Field `jenis` dan `flag` — `10602048` · 2026-11-13
+
+**Kondisi awal:**
+1. Field Nama Penerima menggunakan komponen `<q-select>` autocomplete supplier (`filteredSupplier`). Pengguna harus menekan Enter dengan mode `new-value-mode="add-unique"` jika ingin memasukkan nama baru.
+2. Field bawaan form sandbox DW `50180000ENTBT_m_TTKC` yaitu `ATRBTP10` (Jenis = 102) dan `ATRBTFLAG` (Flag = 1) belum dikirimkan pada payload simpan.
+
+**Solusi:**
+- Mengganti `<q-select>` pada input nama menjadi `<q-input dense outlined v-model="form.namaPenerima" placeholder="Nama penerima" clearable />` agar petugas dapat mengetik nama secara bebas dan cepat.
+- Menambahkan properti default `jenis: 102` dan `flag: 1` pada `data().form` dan method `buildPayload()` di `TTKCC2.vue`.
+- Mendaftarkan dokumentasi properti `jenis` dan `flag` pada schema OpenAPI di `etc/api/ttkcc.yaml`.
+- Memetakan `ATRBTP10 => $rhcp->{jenis} || 102` dan `ATRBTFLAG => defined $rhcp->{flag} ? $rhcp->{flag} : 1` pada insert Header `ENTBT`, serta `ATRBTP10 => 102` pada setiap baris Child Koli di `TTKCC.pm`.
+
+---
+
+## 16. Penerbitan Nomor TTK Resmi via Strict `mkCSNNo()` · 2026-11-13
+
+**Kondisi awal:**
+Penomoran transaksi menggunakan `$ros->mkBTNo('TTKC-')` yang menghasilkan format kode internal `TTKC-16B90000001`.
+
+**Solusi:**
+- Mengalihkan generator nomor menggunakan `$ros->mkCSNNo()` agar nomor transaksi TTK Corporate Kubikasi langsung menggunakan nomor resi resmi/barcode Wahana dari antrean Redis `wax/ttknoq`.
+- Menerapkan pendekatan *strict error handling*: jika antrean di Redis kosong atau tidak terhubung, sistem langsung menghentikan proses (*die* HTTP 500) untuk membatalkan seluruh transaksi database dan mencegah penyimpanan nomor `0` atau duplikasi data di `ENTBT`.
+- Penomoran sub-koli tetap terhubung secara unik dengan format `<nomorResi>/<index>` (contoh: `15656747607/1`, `15656747607/2`).
 
 ## Catatan & Risiko (Status Terkini)
 
