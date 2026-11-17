@@ -185,7 +185,9 @@ flowchart TD
 3. **Penyimpanan TTK Baru (Create TTKCC)**:
    - Payload simpan dikirim ke endpoint controller backend `POST /a/ttkcc/createTTKCC` (Controller `DCAF::Controller::TTKCC`) melalui method `handleSave()` di `TTKCC2.vue`.
    - Field wajib (*mandatory*): Tanggal, Account, Layanan, Asal, Tujuan, Nama Penerima, Alamat Penerima, Gross Weight, dan Koli.
-   - Penomoran resmi di-generate unik via `$ros->mkBTNo('TTKC-')` berbasis Redis harian (format: `TTKC-H5B90000001`). Sub-koli terhubung via foreign key `ATRBTIDP` dengan format penomoran `<nomorInduk>/<index>`.
+   - Field bawaan sistem sandbox DW otomatis disertakan: `jenis` (`ATRBTP10 = 102`) dan `flag` (`ATRBTFLAG = 1`).
+   - Input nama penerima menggunakan input teks manual (`q-input`).
+   - Penomoran resmi di-generate melalui fungsi `$ros->mkCSNNo()` yang mengambil nomor resi resmi dari antrean Redis `wax/ttknoq`. Sub-koli terhubung via foreign key `ATRBTIDP` dengan format penomoran `<nomorResi>/<index>` (contoh: `15656747607/1`, `15656747607/2`).
 4. **Halaman Monitoring & Daftar TTK (`TTKCCList.vue`)**:
    - Akses melalui route `/TTKCCList`.
    - Menampilkan 28 kolom data transaksi lengkap sesuai antarmuka sandbox DW `whnTTKList`.
