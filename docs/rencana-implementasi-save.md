@@ -116,6 +116,8 @@ Mengikuti **The 253 Query ID Rule** (ID di rentang `253000` - `253999`), serta m
 | `ATRBTP01` | Integer | `asalId` | ID Wilayah Asal |
 | `ATRBTP02` | Integer | `tujuanId` | ID Wilayah Tujuan |
 | `ATRBTP09` | String | `kodeOps` | Kode Operasional Rute |
+| `ATRBTP10` | Integer | `jenis` | Jenis Kiriman (Default 102 = Paket Reguler) |
+| `ATRBTFLAG` | Integer | `flag` | Flag Transaksi (Default 1) |
 | `ATRBTP06` | String | `namaPenerima` | Nama Penerima Barang |
 | `ATRBTP07` | String | `telepon` | Nomor Telepon Penerima |
 | `ATRBTP08` | String | `alamat` | Alamat Lengkap Penerima |
@@ -184,10 +186,12 @@ Authorization: Bearer <token>
 **Request Body:**
 ```json
 {
-  "tanggal": "2026-11-06",
+  "tanggal": "2026-11-13",
   "accountId": 188889202,
   "layananId": 7,
   "referensi": "REF-PO-9921",
+  "jenis": 102,
+  "flag": 1,
   "adaPacking": 2,
   "printer": 102,
   "buktiKembali": 100,
