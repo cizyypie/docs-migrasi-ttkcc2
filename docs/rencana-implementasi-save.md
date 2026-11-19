@@ -21,7 +21,7 @@
    3. [Pembagian Kerja](#3-pembagian-kerja)
    4. [Dev A — Frontend](#4-dev-a--frontend)
       - 4.1 [Modifikasi `TTKCC2.vue`](#41-modifikasi-ttkcc2vue)
-      - 4.2 [Buat File Baru `PVwTTKCCLs.vue`](#42-buat-file-baru-pvwttkcclsvue)
+      - 4.2 [Buat File Baru `TTKCCList.vue`](#42-buat-file-baru-ttkcclistvue)
       - 4.3 [Registrasi Route di `routes.js`](#43-registrasi-route-di-webdevdcafsrcrouterroutesjs)
    5. [Dev B — Backend](#5-dev-b--backend)
       - 5.1 [Buat Controller `TTKCC.pm`](#51-buat-controller-libperldcafcontrollerttkccpm)
@@ -45,7 +45,7 @@
    | Loading overlay saat proses | "Creating data..." overlay saat HTTP request berlangsung |
    | Notifikasi hasil | Banner / popup sukses dengan nomor TTK baru atau pesan gagal |
    | Reset & feedback form | Nomor TTK tampil di chip hijau atas, siap cetak resi / buat baru |
-   | Halaman List TTK (`PVwTTKCCLs.vue`) | Tabel daftar riwayat TTK corporate kubikasi yang telah tersimpan |
+   | Halaman List TTK (`TTKCCList.vue`) | Tabel daftar riwayat TTK corporate kubikasi yang telah tersimpan |
    | Filter data list | Filter berdasarkan rentang tanggal, Account corporate, dan status |
    | Navigasi detail | Klik baris nomor TTK membuka halaman TTKCC2 dalam mode referensi / detail |
    
@@ -56,12 +56,12 @@
    | File | Pemilik | Status | Deskripsi |
    |------|---------|--------|-----------|
    | `web/dev/dcaf/src/pages/TTKCC2.vue` | Dev A | Dimodifikasi | Tambah tombol Save, konfirmasi, method save & payload builder |
-   | `web/dev/dcaf/src/pages/PVwTTKCCLs.vue` | Dev A | **File Baru** | Halaman daftar data TTK, filter, dan tabel riwayat (standar `PVw...Ls`) |
-   | `web/dev/dcaf/src/router/routes.js` | Dev A | Dimodifikasi | Registrasi route `/PVwTTKCCLs` (1 baris) |
+   | `web/dev/dcaf/src/pages/TTKCCList.vue` | Dev A | **File Baru** | Halaman daftar data TTK (31 kolom), filter 11 parameter, print & ekspor TSV |
+   | `web/dev/dcaf/src/router/routes.js` | Dev A | Dimodifikasi | Registrasi route `/TTKCCList` (1 baris) |
    | `lib/perl/DCAF/Controller/TTKCC.pm` | Dev B | **File Baru** | Controller API DCAF: operasi `createTTKCC`, `listTTKCC`, `getTTKCC` |
    | `etc/api/ttkcc.yaml` | Dev B | **File Baru** | OpenAPI 3.0 specification untuk routing DCAF |
    | `etc/dcaf.yaml` | Dev B | Dimodifikasi | Registrasi route modul `ttkcc` ke DCAF gateway (1 baris) |
-   | `lib/db/git/dcaf-data.sql` | Dev B | Dimodifikasi | Menambahkan query SELECT baru (`253xxx`) ke tabel `EDBQ` dan `EDBQP` |
+   | `swb.EDBQ` & `swb.EDBQP` (DB Catalog) | Dev B | Dimodifikasi | Query SELECT `ttkccListHeader` (`253102`) & `ttkccFindByNomor` (`253103`) di database `swb` |
    
    ---
    
@@ -88,13 +88,15 @@
    * **Keputusan:**
      Operasi simpan Header TTK dan Child Koli **WAJIB memakai `entbtCreate`**. Parameter yang dikirimkan adalah nama kolom `ENTBT`.
    
-   #### C. Query Baru yang Wajib Didaftarkan (Hanya 2 Query SELECT Baru)
-   Mengikuti **The 253 Query ID Rule** (ID di rentang `253000` - `253999`), serta mendaftarkan seluruh parameter ke `EDBQP`:
-   
-   | No | Nama Query | ID EDBQ | Tipe | Tujuan Penggunaan |
-   |----|------------|---------|------|-------------------|
-   | 1 | `ttkccGetNomor` | `253006` | SELECT | Ambil nomor TTK (`ATRBTNO`) berdasarkan `ATRBTID` |
-   | 2 | `ttkccListHeader` | `253007` | SELECT | Daftar riwayat TTK header dengan filter tanggal, account, dan status untuk `PVwTTKCCLs.vue` |
+#### C. Query Baru yang Wajib Didaftarkan (2 Query SELECT di `swb.EDBQ`)
+Mengikuti **The 253 Query ID Rule** (ID di rentang `253000` - `253999`), serta mendaftarkan seluruh parameter ke `EDBQP`:
+
+| No | Nama Query | ID EDBQ | Tipe | Tujuan Penggunaan |
+|----|------------|---------|------|-------------------|
+| 1 | `ttkccListHeader` | `253102` | SELECT | Daftar riwayat TTK header dengan filter harian (`ATRBTDT_IX`), account, status, kode ops, asal, tujuan, info, dan NIK pembuat untuk `TTKCCList.vue` |
+| 2 | `ttkccFindByNomor` | `253103` | SELECT | Pencarian cepat langsung berdasarkan Nomor TTK via unique index `ENTBT_AK` tanpa filter tanggal |
+
+> *Catatan:* Query `ttkccGetNomor` tidak diperlukan karena nomor TTK resmi langsung diterbitkan sebelum insert header via `$ros->mkCSNNo()`.
    
    ---
    
@@ -107,6 +109,7 @@
    | `ATRBAIDM` | Integer | (Session User / Default 1) | ID User Pembuat Transaksi |
    | `ATRBTTYID` | Integer | (Konstan 5001) | Tipe Transaksi TTK Corporate |
    | `ATRBTDT` | Date | `tanggal` | Tanggal Pengiriman |
+   | `ATRBTNO` | String | (Generated via `mkCSNNo()`) | Nomor TTK Resmi Wahana dari Redis `wax/ttknoq` (contoh: `E46ZHHND`) |
    | `ATRBAIDP` | Integer | `accountId` | ID Account Corporate |
    | `ATRBIID` | Integer | `layananId` | ID Layanan Pengiriman |
    | `ATRBTNOG` | String | `referensi` | Nomor TTK Manual / Ref PO / DN |
@@ -150,6 +153,8 @@
    |-------------|-----------|-------------------|------------|
    | `ATRBAIDO` | Integer | (Default 3002) | ID Cabang Origin / Owner Account |
    | `ATRBAIDM` | Integer | (Session User / Default 1) | ID User Pembuat Transaksi |
+   | `ATRBTNO` | String | `nomorChild` | Format sub-koli `<nomorTTK>/<index>` (contoh: `E46ZHHND/1`, `E46ZHHND/2`) |
+| `ATRBTP10` | Integer | `jenis` | Mengikuti jenis kiriman header (Default 102) |
    | `ATRBTTYID` | Integer | (Konstan 5001) | Tipe Transaksi TTK Corporate |
    | `ATRBAIDP` | Integer | `accountId` | Mengikuti ID Account Header |
    | `ATRBTIDP` | Bigint | `parentBtid` | Relasi ke ID Header (`ENTBT.ATRBTID`) |
@@ -263,13 +268,19 @@
    Authorization: Bearer <token>
    ```
    
-   **Query Parameters:**
-   - `tanggalDari` (Date, optional)
-   - `tanggalSampai` (Date, optional)
-   - `accountId` (Integer, optional)
-   - `status` (Integer, optional)
-   - `d-limit` (Integer, default 25)
-   - `d-offset` (Integer, default 0)
+**Query Parameters:**
+- `tanggalDari` (Date, optional — default hari ini)
+- `tanggalSampai` (Date, optional — default hari ini)
+- `accountId` (Integer, optional)
+- `status` (Integer, optional)
+- `nomor` (String, optional — jika diisi, langsung memakai jalur cepat `ttkccFindByNomor`)
+- `kodeOps` (String, optional)
+- `asal` (String, optional)
+- `tujuan` (String, optional)
+- `info` (String, optional)
+- `nikPembuat` (String, optional)
+- `d-limit` (Integer, default 25)
+- `d-offset` (Integer, default 0)
    
    **Response Sukses (HTTP 200):**
    ```json
@@ -319,9 +330,9 @@
             |                                    |
             v                                    v
      [Dev A - Frontend]                  [Dev B - Backend]
-     1. Tombol & Validasi Save           1. Tambah Query 253006 & 253007
+     1. Tombol & Validasi Save           1. Tambah Query 253102 & 253103
      2. buildPayload & handleSave        2. Registrasi EDBQP & Flush Redis
-     3. Halaman PVwTTKCCLs.vue           3. Controller TTKCC.pm (entbtCreate)
+     3. Halaman TTKCCList.vue            3. Controller TTKCC.pm (mkCSNNo & entbtCreate)
      4. Routing routes.js                4. OpenAPI ttkcc.yaml & dcaf.yaml
             |                                    |
             |------------------------------------|
@@ -391,7 +402,7 @@
    
      try {
        const payload = this.buildPayload()
-       const res = await this.$axios.post('/a/ttkcc/createTTKCC', payload)
+       const res = await this.$axios.post('/ttkcc/createTTKCC', payload)
    
        if (res.data && res.data.code === 0) {
          const nomor = res.data.data.nomor
@@ -429,9 +440,8 @@
    
    ---
    
-   ### 4.2 Buat File Baru `PVwTTKCCLs.vue`
-   **Path:** `web/dev/dcaf/src/pages/PVwTTKCCLs.vue`
-   *(Nama disesuaikan dengan konvensi standar `04-frontend-rules.md`: `PVw<Feature>Ls.vue`).*
+   ### 4.2 Buat File Baru `TTKCCList`
+   **Path:** `web/dev/dcaf/src/pages/TTKCCList.vue` dan route { name: 'TTKCCList', path: '/TTKCCList', component: () => import('pages/TTKCCList.vue') }).
    
    File ini memuat tabel `q-table` riwayat TTK, form filter rentang tanggal, pencarian account, dan tombol pintas navigasi ke detail transaksi atau pembuatan transaksi baru.
    
@@ -459,6 +469,7 @@
       
       use parent 'DCAF::Controller';
       use DCAF::Query;
+      use POSIX qw(strftime);
       
       sub new {
           my ($roc, %ha) = @_;
@@ -726,86 +737,38 @@
    
    ### 5.2 Definisi SQL Query EDBQ & EDBQP (Aturan 253)
    
-   Hanya 2 query SELECT baru yang perlu didaftarkan ke `lib/db/git/dcaf-data.sql` dan dieksekusi di database dev:
-   
-   ```sql
-   -- ============================================================
-   -- Modul TTKCC2 Queries (Tabel EDBQ & EDBQP - Sesuai Range 253)
-   -- ============================================================
-   
-   -- 1. Query ttkccGetNomor (ID 253006)
-   INSERT INTO `EDBQ` (`ADBQID`, `ADBCID`, `ADBQCD`, `ADBQNM`, `ADBQSCR`, `ADBQPAR`, `ADBQCTM`, `ADBQCMT`, `ADBQDTP`)
-   VALUES (
-     253006,
-     3,
-     'ttkccGetNomor',
-     'TTKCC: Ambil ATRBTNO / ATRBTNOG by ID',
-     'SELECT
-     ATRBTID             btid,
-     COALESCE(ATRBTNO, ATRBTNOG, ATRBTID) nomor
-   FROM
-     ta15_wlogisticsidb_ap.ENTBT
-   WHERE
-     ATRBTID = ?',
-     'btid',
-     0,
-     'Dipakai setelah insert entbtCreate untuk mengambil nomor TTK hasil trigger',
-     NOW()
-   );
-   
-   INSERT INTO `EDBQP` (`ADBQPID`, `ADBQID`, `ADBQPCD`, `ADBQPNM`, `ADBQPDV`)
-   VALUES
-     (253006001, 253006, 'btid', 'Business Transaction ID', NULL);
-   
-   
-   -- 2. Query ttkccListHeader (ID 253007)
-   INSERT INTO `EDBQ` (`ADBQID`, `ADBCID`, `ADBQCD`, `ADBQNM`, `ADBQSCR`, `ADBQPAR`, `ADBQCTM`, `ADBQCMT`, `ADBQDTP`)
-   VALUES (
-     253007,
-     3,
-     'ttkccListHeader',
-     'TTKCC: List Header TTK Corporate Kubikasi',
-     'SELECT
-     t.ATRBTID          btid,
-     COALESCE(t.ATRBTNO, t.ATRBTNOG, t.ATRBTID) nomor,
-     date(t.ATRBTDT)    tanggal,
-     concat(ba.ATRBACD, '': '', be.ATRBENM) account,
-     oa.ATRCAREANML     asal,
-     da.ATRCAREANML     tujuan,
-     t.ATRBTQTY         berat,
-     t.ATRBTP16         koli,
-     t.ATRBTVAL         total,
-     t.ATRBTSS          status,
-     lv.ATRLVNM         statusLabel
-   FROM
-     ta15_wlogisticsidb_ap.ENTBT t
-     LEFT JOIN swb.ENTBA ba ON ba.ATRBAID = t.ATRBAIDP
-     LEFT JOIN swb.ENTBE be ON be.ATRBEID = ba.ATRBEID
-     LEFT JOIN swb.ENTCAREA oa ON oa.ATRCAREAID = t.ATRBTP01
-     LEFT JOIN swb.ENTCAREA da ON da.ATRCAREAID = t.ATRBTP02
-     LEFT JOIN swb.ENTLV lv ON lv.ATRLVTYID = 9 AND lv.ATRLVCD = t.ATRBTSS
-   WHERE
-     t.ATRBTTYID = 5001
-     AND (t.ATRBTIDP = 0 OR t.ATRBTIDP IS NULL)
-     AND (? = '''' OR date(t.ATRBTDT) >= ?)
-     AND (? = '''' OR date(t.ATRBTDT) <= ?)
-     AND (? = 0 OR t.ATRBAIDP = ?)
-     AND (? = 0 OR t.ATRBTSS = ?)
-   ORDER BY
-     t.ATRBTDT DESC, t.ATRBTID DESC',
-     'tanggalDari,tanggalDari,tanggalSampai,tanggalSampai,accountId,accountId,status,status',
-     0,
-     'Daftar header transaksi TTK Corporate untuk PVwTTKCCLs.vue',
-     NOW()
-   );
-   
-   INSERT INTO `EDBQP` (`ADBQPID`, `ADBQID`, `ADBQPCD`, `ADBQPNM`, `ADBQPDV`)
-   VALUES
-     (253007001, 253007, 'tanggalDari', 'Filter Tanggal Dari', ''),
-     (253007002, 253007, 'tanggalSampai', 'Filter Tanggal Sampai', ''),
-     (253007003, 253007, 'accountId', 'Filter Partner Account ID', '0'),
-     (253007004, 253007, 'status', 'Filter Status Sistem', '0');
-   ```
+   2 query SELECT baru didaftarkan langsung ke katalog `swb.EDBQ` dan `swb.EDBQP` (bukan ke `lib/db/git/dcaf-data.sql`):
+
+1. **`ttkccListHeader` (`ADBQID = 253102`, `ADBCID = 3`):**
+   - **Parameter (`ADBQPAR` — 18 placeholder):**
+     `tanggalDari,tanggalDari,tanggalSampai,tanggalSampai,accountId,accountId,status,status,kodeOps,kodeOps,asal,asal,tujuan,tujuan,info,info,nikPembuat,nikPembuat`
+   - **Klausa `WHERE` teroptimasi (tanpa `LIKE 'TTKC-%'`, menggunakan pure range `ATRBTDT_IX`):**
+     ```sql
+     WHERE
+       t.ATRBTTYID = 5001
+       AND (t.ATRBTIDP = 0 OR t.ATRBTIDP IS NULL)
+       AND t.ATRBTDT >= concat(if(COALESCE(?, "") = "", curdate(), ?), " 00:00:00")
+       AND t.ATRBTDT <= concat(if(COALESCE(?, "") = "", curdate(), ?), " 23:59:59")
+       AND (COALESCE(?, 0) = 0 OR t.ATRBAIDP = ?)
+       AND (COALESCE(?, 0) = 0 OR t.ATRBTSS = ?)
+       AND (COALESCE(?, "") = "" OR t.ATRBTP09 LIKE concat(?, "%"))
+       AND (COALESCE(?, "") = "" OR oa.ATRCAREANML LIKE concat("%", ?, "%"))
+       AND (COALESCE(?, "") = "" OR da.ATRCAREANML LIKE concat("%", ?, "%"))
+       AND (COALESCE(?, "") = "" OR t.ATRBTP05 LIKE concat("%", ?, "%"))
+       AND (COALESCE(?, "") = "" OR t.ATRBAIDM LIKE concat(?, "%"))
+     ORDER BY
+       t.ATRBTDT DESC, t.ATRBTID DESC
+     ```
+2. **`ttkccFindByNomor` (`ADBQID = 253103`, `ADBCID = 3`):**
+   - **Parameter (`ADBQPAR` — 3 placeholder):** `nomor,nomor,nomor`
+   - **Klausa `WHERE` (jalur cepat via `ENTBT_AK`):**
+     ```sql
+     WHERE
+       (t.ATRBTIDP = 0 OR t.ATRBTIDP IS NULL)
+       AND (t.ATRBTNO = ? OR t.ATRBTNO LIKE concat(?, "%") OR t.ATRBTNOG = ?)
+     ORDER BY
+       t.ATRBTID DESC
+     ```
    
    > **Wajib Dilakukan Langsung (Redis Cache Busting):**
    > Jalankan perintah ini di container backend tepat setelah INSERT SQL berhasil:
