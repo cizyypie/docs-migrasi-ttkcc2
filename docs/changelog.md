@@ -1,7 +1,7 @@
-# 📦 TTKCC2 — Changelog Kalkulasi Tarif & Biaya Tambahan
+# TTKCC2 — Changelog Kalkulasi Tarif & Biaya Tambahan
 
 > **Branch:** `TTKCC2-FZ` · **File terdampak:** `web/dev/dcaf/src/pages/TTKCC2.vue`, `web/dev/dcaf/src/pages/TTKCCList.vue`, `lib/perl/DCAF/Controller/TTKCC.pm`, `etc/api/ttkcc.yaml`, `etc/dcaf.yaml`, Query `ttkccListHeader`
-> **Rentang commit:** `07e5afb5` -> `e114a774` + Optimasi Query EDBQ
+> **Rentang commit:** `07e5afb5` -> `e72791dd` + Optimasi Query EDBQ (`253102` & `253103`)
 
 ---
 
@@ -24,7 +24,7 @@
 | 13 | 2026-11-10 | `53cafe92` | Sinkronisasi opsi status filter dengan master data ENTLV (`ATRLVTYID=9`) | Pilihan status filter pada dialog pencarian 100% konsisten dengan data operasional produksi |
 | 14 | 2026-11-11 | `618f1374` | Tombol Filter full blue & optimasi tabel super kompak 31 kolom | Tombol filter solid tanpa border putih, seluruh kolom tabel tampil rapi dalam 1 layar horizontal |
 | 15 | 2026-11-13 | `10602048` | Input nama penerima manual & penambahan field `jenis` dan `flag` saat save | Input nama bebas tanpa dropdown, header & koli menyimpan `ATRBTP10=102` dan `ATRBTFLAG=1` sesuai sandbox DW |
-| 16 | 2026-11-13 | Update | Migrasi penomoran resmi TTK menggunakan strict `mkCSNNo()` | Nomor TTK diterbitkan langsung dari antrean nomor resi fisik Wahana di Redis (`wax/ttknoq`) |
+| 16 | 2026-11-18 | `e72791dd` | Migrasi penomoran resmi strict `mkCSNNo()` & perbaikan filter `listTTKCC` (`EDBQ 253102`) | Nomor TTK diterbitkan dari antrean Redis `wax/ttknoq` (misal `E46ZHHND`), langsung tampil di `TTKCCList.vue` via range index tanggal harian tanpa filter `TTKC-%` |
 
 ### Alur kalkulasi setelah semua perubahan
 
@@ -122,7 +122,7 @@ flowchart LR
 **Contoh kasus surcharge (ilustrasi):** 2 koli @60 kg, biaya kirim Rp10.000/kg, aturan `ASVC-SCG`: rentang 50 kg–∞, tarif 1.
 `ceil(60) × 1 × 10.000 = 600.000` per koli × 2 koli = **Rp1.200.000**
 
-> ⚠️ Perhatikan: sekarang `grossWeight` per baris koli dianggap **berat per koli**. Kode lama membaginya dengan jumlah koli.
+> WARNING: sekarang `grossWeight` per baris koli dianggap **berat per koli**. Kode lama membaginya dengan jumlah koli.
 
 **Contoh pilihan "Tanpa":**
 
@@ -357,8 +357,6 @@ Tampilan pemantauan daftar TTK kini 100% identik dengan sandbox Dev Wahana (`whn
 
 ---
 
----
-
 ## 15. Input Nama Manual & Penambahan Field `jenis` dan `flag` — `10602048` · 2026-11-13
 
 **Kondisi awal:**
@@ -373,15 +371,26 @@ Tampilan pemantauan daftar TTK kini 100% identik dengan sandbox Dev Wahana (`whn
 
 ---
 
-## 16. Penerbitan Nomor TTK Resmi via Strict `mkCSNNo()` · 2026-11-13
+## 16. Penerbitan Nomor TTK Resmi via Strict `mkCSNNo()` & Penyesuaian Filter `listTTKCC` — `e72791dd` · 2026-11-18
 
 **Kondisi awal:**
-Penomoran transaksi menggunakan `$ros->mkBTNo('TTKC-')` yang menghasilkan format kode internal `TTKC-16B90000001`.
+1. Penomoran transaksi menggunakan `$ros->mkBTNo('TTKC-')` yang menghasilkan format kode internal `TTKC-H5B90000001`.
+2. Query `ttkccListHeader` (`EDBQ` ID `253102`) masih memasang klausa hardcode `AND t.ATRBTNO LIKE "TTKC-%"`, sehingga TTK baru hasil `mkCSNNo()` (seperti `E46ZHHND`) tersaring keluar dan tidak tampil di `TTKCCList.vue`.
+3. Default `filter.tanggalDari` di `TTKCCList.vue` disetel ke tanggal `01` awal bulan.
 
 **Solusi:**
-- Mengalihkan generator nomor menggunakan `$ros->mkCSNNo()` agar nomor transaksi TTK Corporate Kubikasi langsung menggunakan nomor resi resmi/barcode Wahana dari antrean Redis `wax/ttknoq`.
-- Menerapkan pendekatan *strict error handling*: jika antrean di Redis kosong atau tidak terhubung, sistem langsung menghentikan proses (*die* HTTP 500) untuk membatalkan seluruh transaksi database dan mencegah penyimpanan nomor `0` atau duplikasi data di `ENTBT`.
-- Penomoran sub-koli tetap terhubung secara unik dengan format `<nomorResi>/<index>` (contoh: `15656747607/1`, `15656747607/2`).
+- **Backend (`lib/perl/DCAF/Controller/TTKCC.pm`):**
+  - Mengalihkan generator nomor pada `createTTKCC` ke `$ros->mkCSNNo()` (antrean Redis `wax/ttknoq`) dengan *strict error handling* (`die` HTTP 500 jika antrean kosong/tidak tersedia) dan penomoran sub-koli `<nomorTTK>/<index>` (contoh: `E46ZHHND/1`).
+  - Menambahkan `use POSIX qw(strftime);` dan guardrail fallback tanggal hari ini (`$today`) pada `listTTKCC` apabila `tanggalDari` / `tanggalSampai` kosong.
+- **Database Catalog (`swb.EDBQ` ID `253102` — `ttkccListHeader`) & Redis:**
+  - Menghapus filter `AND t.ATRBTNO LIKE "TTKC-%"`.
+  - Mengubah filter tanggal menjadi *pure range condition* `t.ATRBTDT >= concat(if(COALESCE(?, "") = "", curdate(), ?), " 00:00:00")` dan `<= ... " 23:59:59"` (18 parameter, terverifikasi `EXPLAIN` memakai `type = range` pada `ATRBTDT_IX`).
+  - Menghapus cache Redis `drp.qc*ttkccListHeader*` dan reload uWSGI.
+- **Frontend (`web/dev/dcaf/src/pages/TTKCCList.vue`):**
+  - Mengubah default `filter.tanggalDari` dan `resetFilter()` ke tanggal hari ini (`YYYY-MM-DD`) selaras dengan `whnTTKList` sandbox DW.
+  - Memperbarui placeholder filter Nomor TTK menjadi `Nomor TTK (misal E46ZHHND)...`.
+
+---
 
 ## Catatan & Risiko (Status Terkini)
 
