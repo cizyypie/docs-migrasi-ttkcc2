@@ -153,12 +153,11 @@ Mengikuti **The 253 Query ID Rule** (ID di rentang `253000` - `253999`), serta m
    |-------------|-----------|-------------------|------------|
    | `ATRBAIDO` | Integer | (Default 3002) | ID Cabang Origin / Owner Account |
    | `ATRBAIDM` | Integer | (Session User / Default 1) | ID User Pembuat Transaksi |
-   | `ATRBTNO` | String | `nomorChild` | Format sub-koli `<nomorTTK>/<index>` (contoh: `E46ZHHND/1`, `E46ZHHND/2`) |
-| `ATRBTP10` | Integer | `jenis` | Mengikuti jenis kiriman header (Default 102) |
    | `ATRBTTYID` | Integer | (Konstan 5001) | Tipe Transaksi TTK Corporate |
    | `ATRBAIDP` | Integer | `accountId` | Mengikuti ID Account Header |
    | `ATRBTIDP` | Bigint | `parentBtid` | Relasi ke ID Header (`ENTBT.ATRBTID`) |
-   | `ATRBTNO` | String | `nomor` | Nomor TTK yang sama dengan header |
+   | `ATRBTNO` | String | `nomorChild` | Format sub-koli `<nomorTTK>/<index>` (contoh: `E46ZHHND/1`, `E46ZHHND/2`) |
+   | `ATRBTP10` | Integer | `jenis` | Mengikuti jenis kiriman header (Default 102) |
    | `ATRBTDT` | Date | `tanggal` | Mengikuti tanggal header |
    | `ATRBTP16` | Integer | `koli` | Nomor urut koli (Koli ke-1, 2, dst) |
    | `ATRBTQTY` | Decimal | `grossWeight` | Berat Kotor Koli (KG) |
@@ -254,7 +253,7 @@ Mengikuti **The 253 Query ID Rule** (ID di rentang `253000` - `253999`), serta m
      "message": "TTK berhasil dibuat",
      "data": {
        "btid": 123456789,
-       "nomor": "15656747607"
+       "nomor": "E46ZHHND"
      }
    }
    ```
@@ -292,7 +291,7 @@ Mengikuti **The 253 Query ID Rule** (ID di rentang `253000` - `253999`), serta m
        "body": [
          {
            "btid": 123456789,
-           "nomor": "15656747607",
+           "nomor": "E46ZHHND",
            "tanggal": "2026-11-06",
            "account": "2100081011: Astra International",
            "asal": "Jawa Barat, Kab. Bekasi",
@@ -440,19 +439,19 @@ Mengikuti **The 253 Query ID Rule** (ID di rentang `253000` - `253999`), serta m
    
    ---
    
-   ### 4.2 Buat File Baru `TTKCCList`
-   **Path:** `web/dev/dcaf/src/pages/TTKCCList.vue` dan route { name: 'TTKCCList', path: '/TTKCCList', component: () => import('pages/TTKCCList.vue') }).
-   
-   File ini memuat tabel `q-table` riwayat TTK, form filter rentang tanggal, pencarian account, dan tombol pintas navigasi ke detail transaksi atau pembuatan transaksi baru.
-   
-   ---
-   
-   ### 4.3 Registrasi Route di `web/dev/dcaf/src/router/routes.js`
-   
-   ```javascript
-   // TTK Corporate Kubikasi
-   { name: 'TTKCC2', path: '/TTKCC2', component: () => import('pages/TTKCC2.vue') },
-   { name: 'PVwTTKCCLs', path: '/PVwTTKCCLs', component: () => import('pages/PVwTTKCCLs.vue') },
+### 4.2 Buat File Baru `TTKCCList.vue`
+**Path:** `web/dev/dcaf/src/pages/TTKCCList.vue`
+
+File ini memuat tabel `q-table` riwayat TTK (31 kolom sesuai sandbox DW `whnTTKList`), form filter 11 parameter, cetak tabel (Portrait/Landscape), ekspor `.tsv`, dan tombol pintas navigasi ke detail transaksi atau pembuatan transaksi baru.
+
+---
+
+### 4.3 Registrasi Route di `web/dev/dcaf/src/router/routes.js`
+
+```javascript
+// TTK Corporate Kubikasi
+{ name: 'TTKCC2', path: '/TTKCC2', component: () => import('pages/TTKCC2.vue') },
+{ name: 'TTKCCList', path: '/TTKCCList', component: () => import('pages/TTKCCList.vue') },
    ```
    
    ---
@@ -654,20 +653,21 @@ Mengikuti **The 253 Query ID Rule** (ID di rentang `253000` - `253999`), serta m
                       };
                       $ros->q2j('ttkccFindByNomor', $rhparNomor, $opt, $rhres);
                   } else {
-                      # Opsi 2: Jalur Browsing Harian / Monitoring Terindeks Tanggal
-                      my $rhpar = {
-                          tanggalDari   => $rhqp->{'tanggalDari'} || '',
-                          tanggalSampai => $rhqp->{'tanggalSampai'} || '',
-                          accountId     => $rhqp->{'accountId'} || 0,
-                          status        => $rhqp->{'status'} || 0,
-                          kodeOps       => $rhqp->{'kodeOps'} || '',
-                          asal          => $rhqp->{'asal'} || '',
-                          tujuan        => $rhqp->{'tujuan'} || '',
-                          info          => $rhqp->{'info'} || '',
-                          nikPembuat    => $rhqp->{'nikPembuat'} || '',
-                      };
-                      $ros->q2j('ttkccListHeader', $rhpar, $opt, $rhres);
-                  }
+                            # Opsi 2: Jalur Browsing Harian / Monitoring Terindeks Tanggal
+                my $today = strftime('%Y-%m-%d', localtime);
+                my $rhpar = {
+                    tanggalDari   => $rhqp->{'tanggalDari'}   || $today,
+                    tanggalSampai => $rhqp->{'tanggalSampai'} || $today,
+                    accountId     => $rhqp->{'accountId'}     || 0,
+                    status        => $rhqp->{'status'}        || 0,
+                    kodeOps       => $rhqp->{'kodeOps'}       || '',
+                    asal          => $rhqp->{'asal'}          || '',
+                    tujuan        => $rhqp->{'tujuan'}        || '',
+                    info          => $rhqp->{'info'}          || '',
+                    nikPembuat    => $rhqp->{'nikPembuat'}    || '',
+                };
+                $ros->q2j('ttkccListHeader', $rhpar, $opt, $rhres);
+            }
       
                   $ros->{templateData}->{jstext} = $DCAF::ros->{json}->encode({
                       code    => 0,
@@ -770,13 +770,13 @@ Mengikuti **The 253 Query ID Rule** (ID di rentang `253000` - `253999`), serta m
        t.ATRBTID DESC
      ```
    
-   > **Wajib Dilakukan Langsung (Redis Cache Busting):**
-   > Jalankan perintah ini di container backend tepat setelah INSERT SQL berhasil:
-   > ```bash
-   > redis-cli keys "drp.qc*ttkccGetNomor*" | xargs redis-cli del
-   > redis-cli keys "drp.qc*ttkccListHeader*" | xargs redis-cli del
-   > ```
-   
+> **Wajib Dilakukan Langsung (Redis Cache Busting):**
+> Hapus cache definisi query pada Redis untuk `ttkccListHeader` dan `ttkccFindByNomor`, lalu reload uWSGI (`touch /tmp/reload`) tepat setelah perubahan `EDBQ`/`EDBQP`:
+> ```bash
+> redis-cli keys "drp.qc*ttkccListHeader*" | xargs redis-cli del
+> redis-cli keys "drp.qc*ttkccFindByNomor*" | xargs redis-cli del
+> ```
+
    ---
    
    ### 5.3 Buat File Spesifikasi `etc/api/ttkcc.yaml`
@@ -799,58 +799,103 @@ Mengikuti **The 253 Query ID Rule** (ID di rentang `253000` - `253999`), serta m
    tags:
      - name: TTKCC
        description: TTK Corporate Kubikasi
-   components:
-     securitySchemes:
-       bearer:
-         type: http
-         scheme: bearer
-   paths:
-     /createTTKCC:
-       post:
-         tags:
-           - TTKCC
-         summary: Buat record TTK Corporate Kubikasi baru
-         operationId: createTTKCC/TTKCC
-         security:
-           - bearer: []
-         requestBody:
-           required: true
-           content:
-             application/json:
-               schema:
-                 type: object
-                 required: [tanggal, accountId, layananId, asalId, tujuanId, namaPenerima, alamat, grossWeight, koli]
-         responses:
-           200:
-             description: Berhasil membuat TTK
-   
-     /listTTKCC:
-       get:
-         tags:
-           - TTKCC
-         summary: Daftar TTK Corporate Kubikasi
-         operationId: listTTKCC/TTKCC
-         security:
-           - bearer: []
-         parameters:
-           - in: query
-             name: tanggalDari
-             schema: { type: string, format: date }
-           - in: query
-             name: tanggalSampai
-             schema: { type: string, format: date }
-           - in: query
-             name: accountId
-             schema: { type: integer }
-           - in: query
-             name: d-limit
-             schema: { type: integer, default: 25 }
-           - in: query
-             name: d-offset
-             schema: { type: integer, default: 0 }
-         responses:
-           200:
-             description: Berhasil memuat daftar TTK
+components:
+  securitySchemes:
+    bearer:
+      type: http
+      scheme: bearer
+    cookie:
+      type: apiKey
+      in: cookie
+      name: dcaf
+paths:
+  /createTTKCC:
+    post:
+      tags:
+        - TTKCC
+      summary: Buat record TTK Corporate Kubikasi baru
+      operationId: createTTKCC/TTKCC
+      security:
+        - bearer: []
+        - cookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tanggal, accountId, layananId, asalId, tujuanId, namaPenerima, alamat, grossWeight, koli]
+      responses:
+        200:
+          description: Berhasil membuat TTK
+
+  /listTTKCC:
+    get:
+      tags:
+        - TTKCC
+      summary: Daftar TTK Corporate Kubikasi
+      operationId: listTTKCC/TTKCC
+      security:
+        - bearer: []
+        - cookie: []
+      parameters:
+        - in: query
+          name: tanggalDari
+          schema: { type: string, format: date }
+        - in: query
+          name: tanggalSampai
+          schema: { type: string, format: date }
+        - in: query
+          name: accountId
+          schema: { type: integer }
+        - in: query
+          name: status
+          schema: { type: integer }
+        - in: query
+          name: nomor
+          schema: { type: string }
+        - in: query
+          name: kodeOps
+          schema: { type: string }
+        - in: query
+          name: asal
+          schema: { type: string }
+        - in: query
+          name: tujuan
+          schema: { type: string }
+        - in: query
+          name: info
+          schema: { type: string }
+        - in: query
+          name: nikPembuat
+          schema: { type: string }
+        - in: query
+          name: d-limit
+          schema: { type: integer, default: 25 }
+        - in: query
+          name: d-offset
+          schema: { type: integer, default: 0 }
+      responses:
+        200:
+          description: Berhasil memuat daftar TTK
+
+  /getTTKCC/{btid}:
+    get:
+      tags:
+        - TTKCC
+      summary: Ambil detail TTK Corporate Kubikasi
+      operationId: getTTKCC/TTKCC
+      security:
+        - bearer: []
+        - cookie: []
+      parameters:
+        - in: path
+          name: btid
+          required: true
+          schema: { type: integer }
+      responses:
+        200:
+          description: Berhasil memuat detail TTK
    ```
    
    ---
@@ -876,7 +921,7 @@ Mengikuti **The 253 Query ID Rule** (ID di rentang `253000` - `253999`), serta m
    **Checklist Dev A (Frontend):**
    - [x] Modifikasi `TTKCC2.vue` (tambah state `isSaving`, computed `isReadyToSave`, tombol Save).
    - [x] Implementasi fungsi `handleSave` dan `buildPayload` di `TTKCC2.vue`.
-   - [x] Buat halaman baru `TTKCCList.vue` (28 kolom sandbox, styling Quasar SWB, tombol aksi).
+   - [x] Buat halaman baru `TTKCCList.vue` (31 kolom sandbox, styling Quasar SWB, tombol aksi).
    - [x] Tambah dependensi `@capacitor/core: ^3.9.0` untuk kelengkapan plugin kamera.
    - [x] Daftarkan route di `web/dev/dcaf/src/router/routes.js` (`/TTKCCList`).
    - [x] Uji visual form & tombol di browser (Dev Server Quasar) — lulus ESLint 0 error.
@@ -884,7 +929,7 @@ Mengikuti **The 253 Query ID Rule** (ID di rentang `253000` - `253999`), serta m
    **Checklist Dev B (Backend):**
    - [x] Daftarkan query SQL ke catalog `EDBQ` (`entbtCreate` 253005 dan `ttkccListHeader` 253102).
    - [x] Buat class controller `lib/perl/DCAF/Controller/TTKCC.pm`.
-   - [x] Integrasikan auto-numbering resmi via helper `$ros->mkBTNo('TTKC-')` dan penomoran sub-koli `<nomorTTK>/<index>`.
+   - [x] Integrasikan auto-numbering resmi via helper `$ros->mkCSNNo()` dan penomoran sub-koli `<nomorTTK>/<index>`.
    - [x] Jalankan uji sintaks: `perl -c -Ilib/perl lib/perl/DCAF/Controller/TTKCC.pm` (Syntax OK).
    - [x] Buat file OpenAPI `etc/api/ttkcc.yaml`.
    - [x] Daftarkan modul di `etc/dcaf.yaml` (`/a/ttkcc: etc/api/ttkcc.yaml`).
@@ -894,9 +939,9 @@ Mengikuti **The 253 Query ID Rule** (ID di rentang `253000` - `253999`), serta m
    - [x] Isi form lengkap di `TTKCC2.vue` lalu klik Save.
    - [x] Verifikasi dialog konfirmasi muncul: "Are you sure to CREATE new record?".
    - [x] Verifikasi data tersimpan di tabel `ENTBT` (baik header `ATRBTID` maupun child koli `ATRBTIDP`).
-   - [x] Verifikasi notifikasi nomor TTK tampil di UI form (`TTKC-H5B90000001` berhasil dibuat).
+   - [x] Verifikasi notifikasi nomor TTK tampil di UI form (contoh: `E46ZHHND` berhasil dibuat).
    - [x] Buka halaman `TTKCCList.vue` dan pastikan record TTK baru muncul pada tabel.
-   - [x] Optimasi query `ttkccListHeader` (sargable date filter & prefix filter `TTKC-%`) terpangkas dari > 60s ke 12 ms.
+   - [x] Optimasi query `ttkccListHeader` (pure range index `ATRBTDT_IX` tanpa filter `TTKC-%`) terpangkas dari > 60s ke hitungan milidetik.
    - [x] Cek filter tanggal dan filter account pada `TTKCCList.vue`.
    
    ### Phase 4 — Commit & Verification
@@ -912,7 +957,12 @@ Mengikuti **The 253 Query ID Rule** (ID di rentang `253000` - `253999`), serta m
    - [x] Penanganan parameter SQL NULL pada query catalog `ttkccListHeader` (`253102`) menggunakan `COALESCE(?, "") = ""` dan default value `EDBQP` (`ADBQPDV`).
    - [x] Sinkronisasi opsi status filter dropdown (`optionsStatus`) dengan master tabel `ta15_wlogisticsidb_ap.ENTLV` (`ATRLVTYID = 9`).
    - [x] Commit `14405297` dan `53cafe92` pada repository `swb`.
-   
+
+   ### Phase 6 — Input Nama Manual, Field `jenis`/`flag`, Strict `mkCSNNo()`, & Update `ttkccListHeader` (2026-11-13 s/d 2026-11-18)
+- [x] Ubah input Nama Penerima menjadi manual (`q-input`) dan kirim field `jenis: 102` (`ATRBTP10`) & `flag: 1` (`ATRBTFLAG`) pada commit `10602048`.
+- [x] Migrasi penomoran resmi TTK ke `$ros->mkCSNNo()` (Redis `wax/ttknoq`) dengan *strict error handling* (`die` HTTP 500).
+- [x] Update query `ttkccListHeader` (`253102`): hapus filter `TTKC-%`, gunakan pure range `ATRBTDT_IX` + fallback `curdate()`, lalu bust cache Redis.
+- [x] Guardrail tanggal hari ini di `TTKCC.pm` (`strftime`) dan default `tanggalDari` hari ini di `TTKCCList.vue` pada commit `e72791dd`.
    ---
    
    ## 7. Hal Kritis & Catatan Verifikasi
@@ -922,14 +972,14 @@ Mengikuti **The 253 Query ID Rule** (ID di rentang `253000` - `253999`), serta m
    
    1. **Penggunaan Generic Query `entbtCreate` (ID `253005`):**
       Tidak perlu membuat query INSERT custom baru. `entbtCreate` sudah dirancang khusus untuk menangani tabel `ENTBT` pada koneksi 3 (`ta15_wlogisticsidb_ap`).
-   2. **Nomor TTK Generator Resmi:**
-      Penomoran TTK menggunakan helper bawaan DCAF `$ros->mkBTNo('TTKC-')` berbasis Redis harian. Menghasilkan format resmi seperti `TTKC-H5B90000001`, dan child koli terhubung melalui kolom `ATRBTIDP` dengan format `TTKC-H5B90000001/1`.
-   3. **Privilege Database & Indexing ENTBT:**
-      Query `ttkccListHeader` (`253102`, `ADBCID = 3`) mengeksekusi data pada `ta15_wlogisticsidb_ap.ENTBT`. Wajib menggunakan filter tanggal *sargable* `t.ATRBTDT >= concat(?, ' 00:00:00')` dan prefix `t.ATRBTNO LIKE 'TTKC-%'` untuk menghindari *Full Table Scan* pada puluhan juta baris data (waktu respon 12 ms vs >60s timeout).
+2. **Nomor TTK Generator Resmi (`mkCSNNo`):**
+   Penomoran TTK menggunakan helper resmi DCAF `$ros->mkCSNNo()` dari antrean Redis `wax/ttknoq` (contoh: `E46ZHHND`), dan child koli terhubung melalui kolom `ATRBTIDP` dengan format `<nomorTTK>/<index>` (contoh: `E46ZHHND/1`). Jika antrean Redis kosong atau stok di bawah ambang batas, request dihentikan (`HTTP 500`) untuk mencegah nomor kosong atau duplikat.
+3. **Privilege Database & Indexing ENTBT:**
+   Query `ttkccListHeader` (`253102`, `ADBCID = 3`) mengeksekusi data pada `ta15_wlogisticsidb_ap.ENTBT`. Wajib menggunakan *pure range* tanggal *sargable* (`t.ATRBTDT >= concat(if(COALESCE(?, "") = "", curdate(), ?), " 00:00:00")`) tanpa `LIKE 'TTKC-%'` agar tetap memakai index `ATRBTDT_IX` sekaligus menampilkan nomor hasil `mkCSNNo()`.
    4. **Disiplin Gaya Kode & Redis Cache:**
       Sesuai aturan arsitektur SWB, tidak ada penulisan string SQL di dalam controller Perl. Seluruh query menggunakan `EDBQ` catalog dan cache Redis langsung dibersihkan (`flush`) setelah penambahan atau perubahan definisi query. Dilarang menggunakan emoticon / emoji pada file kode maupun dokumentasi.
    5. **Direktori Request Logging uWSGI:**
       Pastikan target symlink request log `/hdd/logs/nginx/swb/requests/api` memiliki permission writeable pada lingkungan kontainer/server uWSGI agar `DCAF/Web.pm` dapat menulis log request tanpa error 500.
    
    ---
-   *Dokumen ini diperbarui: 2026-11-10 — Implementasi Save & List TTKCC2 selesai dan terverifikasi 100% fungsional.*
+   *Dokumen ini diperbarui: 2026-11-19 — Implementasi Save & List TTKCC2 (termasuk migrasi `mkCSNNo()` dan perbaikan filter `ttkccListHeader`) selesai dan terverifikasi.*
