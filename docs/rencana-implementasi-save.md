@@ -653,21 +653,21 @@ File ini memuat tabel `q-table` riwayat TTK (31 kolom sesuai sandbox DW `whnTTKL
                       };
                       $ros->q2j('ttkccFindByNomor', $rhparNomor, $opt, $rhres);
                   } else {
-                            # Opsi 2: Jalur Browsing Harian / Monitoring Terindeks Tanggal
-                my $today = strftime('%Y-%m-%d', localtime);
-                my $rhpar = {
-                    tanggalDari   => $rhqp->{'tanggalDari'}   || $today,
-                    tanggalSampai => $rhqp->{'tanggalSampai'} || $today,
-                    accountId     => $rhqp->{'accountId'}     || 0,
-                    status        => $rhqp->{'status'}        || 0,
-                    kodeOps       => $rhqp->{'kodeOps'}       || '',
-                    asal          => $rhqp->{'asal'}          || '',
-                    tujuan        => $rhqp->{'tujuan'}        || '',
-                    info          => $rhqp->{'info'}          || '',
-                    nikPembuat    => $rhqp->{'nikPembuat'}    || '',
-                };
-                $ros->q2j('ttkccListHeader', $rhpar, $opt, $rhres);
-            }
+                                  # Opsi 2: Jalur Browsing Harian / Monitoring Terindeks Tanggal
+                      my $today = strftime('%Y-%m-%d', localtime);
+                      my $rhpar = {
+                          tanggalDari   => $rhqp->{'tanggalDari'}   || $today,
+                          tanggalSampai => $rhqp->{'tanggalSampai'} || $today,
+                          accountId     => $rhqp->{'accountId'}     || 0,
+                          status        => $rhqp->{'status'}        || 0,
+                          kodeOps       => $rhqp->{'kodeOps'}       || '',
+                          asal          => $rhqp->{'asal'}          || '',
+                          tujuan        => $rhqp->{'tujuan'}        || '',
+                          info          => $rhqp->{'info'}          || '',
+                          nikPembuat    => $rhqp->{'nikPembuat'}    || '',
+                      };
+                      $ros->q2j('ttkccListHeader', $rhpar, $opt, $rhres);
+                  }
       
                   $ros->{templateData}->{jstext} = $DCAF::ros->{json}->encode({
                       code    => 0,
@@ -782,23 +782,23 @@ File ini memuat tabel `q-table` riwayat TTK (31 kolom sesuai sandbox DW `whnTTKL
    ### 5.3 Buat File Spesifikasi `etc/api/ttkcc.yaml`
    
    ```yaml
-   # dcaf:01
-   openapi: 3.0.0
-   info:
-     version: 1.0.0
-     title: TTKCC
-     description: TTK Corporate Kubikasi API
-     contact:
-       email: aab@pirantimaya.id
-   servers:
-     - url: https://swb.stage.wahana.com/a/ttkcc
-     - url: https://swbprod.stage.wahana.com/a/ttkcc
-     - url: https://swb.wahana.com/a/ttkcc
-     - url: https://localhost:44311/a/ttkcc
-     - url: https://swb-rc.wahana.com/a/ttkcc
-   tags:
-     - name: TTKCC
-       description: TTK Corporate Kubikasi
+# dcaf:01
+openapi: 3.0.0
+info:
+  version: 1.0.0
+  title: TTKCC
+  description: TTK Corporate Kubikasi API
+  contact:
+    email: aab@pirantimaya.id
+servers:
+  - url: https://swb.stage.wahana.com/a/ttkcc
+  - url: https://swbprod.stage.wahana.com/a/ttkcc
+  - url: https://swb.wahana.com/a/ttkcc
+  - url: https://localhost:44311/a/ttkcc
+  - url: https://swb-rc.wahana.com/a/ttkcc
+tags:
+  - name: TTKCC
+    description: TTK Corporate Kubikasi
 components:
   securitySchemes:
     bearer:
@@ -963,6 +963,7 @@ paths:
 - [x] Migrasi penomoran resmi TTK ke `$ros->mkCSNNo()` (Redis `wax/ttknoq`) dengan *strict error handling* (`die` HTTP 500).
 - [x] Update query `ttkccListHeader` (`253102`): hapus filter `TTKC-%`, gunakan pure range `ATRBTDT_IX` + fallback `curdate()`, lalu bust cache Redis.
 - [x] Guardrail tanggal hari ini di `TTKCC.pm` (`strftime`) dan default `tanggalDari` hari ini di `TTKCCList.vue` pada commit `e72791dd`.
+      
    ---
    
    ## 7. Hal Kritis & Catatan Verifikasi
